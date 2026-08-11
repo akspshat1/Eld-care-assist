@@ -3,6 +3,7 @@ import streamlit as st
 
 from core.database import (
     add_message,
+    add_resident,
     create_conversation,
     get_extraction,
     get_messages,
@@ -11,6 +12,7 @@ from core.database import (
     seed_residents_from_personas,
 )
 from core.llm_client import transcribe_audio
+from core.tts_client import speak
 from features.conversation import build_system_prompt, get_ai_reply, load_personas
 from features.extraction import extract_conversation
 
@@ -30,6 +32,19 @@ selected_resident = residents_by_id[selected_id]
 
 st.sidebar.write(f"性格: {selected_resident['personality']}")
 st.sidebar.write(f"好きな話題: {selected_resident['favorite_topics']}")
+
+with st.sidebar.expander("新しい入居者を追加"):
+    with st.form("add_resident_form", clear_on_submit=True):
+        new_name = st.text_input("名前")
+        new_personality = st.text_area("性格")
+        new_topics = st.text_input("好きな話題（「、」で区切って複数入力できます）")
+        if st.form_submit_button("追加"):
+            if not new_name:
+                st.warning("名前を入力してください。")
+            else:
+                add_resident(new_name, new_personality, new_topics)
+                st.success(f"{new_name}さんを追加しました。")
+                st.rerun()
 
 # Start a new conversation session when the resident changes, or on first load.
 if st.session_state.get("resident_id") != selected_id:
@@ -72,6 +87,7 @@ if user_input:
             reply = get_ai_reply(api_messages)
         st.write(reply)
     add_message(conversation_id, "assistant", reply)
+    speak(reply)
 
 st.sidebar.divider()
 if st.sidebar.button("この会話の記録を保存"):

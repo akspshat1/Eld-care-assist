@@ -73,7 +73,16 @@ def init_db():
     conn = get_connection()
     conn.executescript(SCHEMA)
     conn.commit()
+    _migrate(conn)
     conn.close()
+
+
+def _migrate(conn):
+    """Add columns to already-existing tables that predate them."""
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(reminders)")]
+    if "last_fired_at" not in columns:
+        conn.execute("ALTER TABLE reminders ADD COLUMN last_fired_at TEXT")
+        conn.commit()
 
 
 def list_tables():
@@ -100,6 +109,17 @@ def seed_residents_from_personas(personas):
     conn.close()
 
 
+def add_resident(name, personality, favorite_topics):
+    """Add a new resident persona, created by the caregiver at runtime."""
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO residents (name, personality, favorite_topics) VALUES (?, ?, ?)",
+        (name, personality, favorite_topics),
+    )
+    conn.commit()
+    conn.close()
+
+
 def get_residents():
     """Return all residents as a list of dicts."""
     conn = get_connection()
@@ -110,6 +130,19 @@ def get_residents():
     residents = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return residents
+
+
+def get_resident(resident_id):
+    """Return a single resident, or None if it doesn't exist."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT id, name, personality, favorite_topics FROM residents WHERE id = ?",
+        (resident_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def create_conversation(resident_id):
@@ -123,6 +156,19 @@ def create_conversation(resident_id):
     conversation_id = cursor.lastrowid
     conn.close()
     return conversation_id
+
+
+def get_conversation(conversation_id):
+    """Return a single conversation's row, or None if it doesn't exist."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT id, resident_id, started_at FROM conversations WHERE id = ?",
+        (conversation_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def add_message(conversation_id, role, content):
@@ -238,6 +284,38 @@ def get_reminders(resident_id=None):
 def get_active_reminders():
     """Return only active reminders, for the background scheduler to use."""
     return [r for r in get_reminders() if r["is_active"]]
+
+
+def get_due_reminders():
+    """Return active reminders whose time has passed today and that have not
+    already fired today. Used by the frontend's polling loop."""
+    now = datetime.now()
+    today = now.date().isoformat()
+    current_hm = now.strftime("%H:%M")
+
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT r.id, r.resident_id, r.time, r.content, res.name AS resident_name "
+        "FROM reminders r JOIN residents res ON res.id = r.resident_id "
+        "WHERE r.is_active = 1 AND r.time <= ? "
+        "AND (r.last_fired_at IS NULL OR r.last_fired_at != ?)",
+        (current_hm, today),
+    )
+    reminders = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return reminders
+
+
+def mark_reminder_fired(reminder_id):
+    """Record that a reminder has fired today, so it isn't repeated."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE reminders SET last_fired_at = ? WHERE id = ?",
+        (datetime.now().date().isoformat(), reminder_id),
+    )
+    conn.commit()
+    conn.close()
 
 
 def set_reminder_active(reminder_id, is_active):
