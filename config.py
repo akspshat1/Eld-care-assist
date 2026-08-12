@@ -18,4 +18,4 @@ GROQ_WHISPER_MODEL = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
 GROQ_API_BASE = "https://api.groq.com/openai/v1"
 
 # --- Database settings ---
-DB_PATH = str(BASE_DIR / "data" / "eldercare.db")
+CHROMA_PATH = str(BASE_DIR / "data" / "chroma")

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiGet, apiPost, apiPostForm } from "@/lib/api";
+import { startHandsFreeCall, type HandsFreeCall } from "@/lib/webrtc";
 
 type Resident = {
   id: number;
@@ -46,6 +47,9 @@ export default function ConversationPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  const [isHandsFree, setIsHandsFree] = useState(false);
+  const handsFreeCallRef = useRef<HandsFreeCall | null>(null);
+
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
 
@@ -58,6 +62,11 @@ export default function ConversationPage() {
 
   useEffect(() => {
     if (selectedResidentId === null) return;
+    if (handsFreeCallRef.current) {
+      handsFreeCallRef.current.stop();
+      handsFreeCallRef.current = null;
+      setIsHandsFree(false);
+    }
     apiPost<{ conversation_id: number }>("/conversations", {
       resident_id: selectedResidentId,
     }).then((data) => {
@@ -152,6 +161,35 @@ export default function ConversationPage() {
     }
   }
 
+  async function startHandsFree() {
+    if (conversationId === null || isHandsFree) return;
+    setIsHandsFree(true);
+    handsFreeCallRef.current = await startHandsFreeCall(conversationId, (msg) => {
+      setMessages((prev) => [
+        ...prev,
+        { role: msg.role, content: msg.text, created_at: new Date().toISOString() },
+      ]);
+      if (msg.role === "assistant") speak(msg.text);
+    });
+  }
+
+  async function stopHandsFree() {
+    handsFreeCallRef.current?.stop();
+    handsFreeCallRef.current = null;
+    setIsHandsFree(false);
+    // Re-sync with the DB in case any turn's app-message arrived out of order.
+    if (conversationId !== null) {
+      const data = await apiGet<Message[]>(`/conversations/${conversationId}/messages`);
+      setMessages(data);
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      handsFreeCallRef.current?.stop();
+    };
+  }, []);
+
   async function handleExtract() {
     if (conversationId === null || messages.length === 0) return;
     setIsExtracting(true);
@@ -242,6 +280,25 @@ export default function ConversationPage() {
           </div>
         ))}
         {isSending && <p className="text-sm text-neutral-400">考え中...</p>}
+        {isHandsFree && (
+          <p className="text-sm text-accent">
+            ハンズフリー会話中... 話しかけると自動で応答します。
+          </p>
+        )}
+      </section>
+
+      <section className="flex gap-2">
+        <button
+          className={`rounded px-4 py-2 text-sm font-medium ${
+            isHandsFree
+              ? "bg-red-600 text-white"
+              : "border border-accent text-accent hover:bg-accent hover:text-white"
+          }`}
+          onClick={isHandsFree ? stopHandsFree : startHandsFree}
+          disabled={conversationId === null || isRecording}
+        >
+          {isHandsFree ? "ハンズフリー会話を終了" : "ハンズフリー会話を開始"}
+        </button>
       </section>
 
       <section className="flex gap-2">
@@ -253,20 +310,21 @@ export default function ConversationPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSend();
           }}
+          disabled={isHandsFree}
         />
         <button
           className={`rounded px-4 py-2 text-sm ${
             isRecording ? "bg-red-600 text-white" : "border border-neutral-300 text-neutral-700"
           }`}
           onClick={isRecording ? stopRecording : startRecording}
-          disabled={isSending}
+          disabled={isSending || isHandsFree}
         >
           {isRecording ? "停止" : "録音"}
         </button>
         <button
           className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-40"
           onClick={handleSend}
-          disabled={isSending || !textInput.trim()}
+          disabled={isSending || !textInput.trim() || isHandsFree}
         >
           送信
         </button>

@@ -4,9 +4,13 @@ This is a thin HTTP layer over the existing core/ and features/ modules.
 No business logic should live here that isn't already in those modules —
 that keeps the Streamlit pages and this API both working off the same code.
 """
+import asyncio
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 
 from core.database import (
     add_message,
@@ -29,6 +33,7 @@ from core.database import (
     set_reminder_active,
 )
 from core.llm_client import transcribe_audio
+from core.voice_pipeline import run_voice_bot
 from features.conversation import build_system_prompt, get_ai_reply, load_personas
 from features.extraction import extract_conversation
 from features.report import generate_report
@@ -60,6 +65,11 @@ class ConversationCreate(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str
+
+
+class VoiceOffer(BaseModel):
+    sdp: str
+    type: str
 
 
 class ReminderCreate(BaseModel):
@@ -133,6 +143,27 @@ async def send_audio_message(conversation_id: int, file: UploadFile = File(...))
     transcribed_text = transcribe_audio(audio_bytes, filename=file.filename or "audio.webm")
     reply = _reply_to_message(conversation_id, transcribed_text)
     return {"transcribed_text": transcribed_text, "reply": reply}
+
+
+@app.post("/conversations/{conversation_id}/voice/offer")
+async def voice_offer(conversation_id: int, payload: VoiceOffer):
+    """Accept a WebRTC SDP offer from the browser and start a hands-free
+    Pipecat voice session (Groq STT + Groq LLM, VAD-driven, no button
+    presses) for this conversation. Returns the SDP answer."""
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="conversation not found")
+    resident = get_resident(conversation["resident_id"])
+    if resident is None:
+        raise HTTPException(status_code=404, detail="resident not found")
+
+    connection = SmallWebRTCConnection()
+    await connection.initialize(sdp=payload.sdp, type=payload.type)
+    answer = connection.get_answer()
+
+    asyncio.create_task(run_voice_bot(connection, conversation_id, resident))
+
+    return {"sdp": answer["sdp"], "type": answer["type"]}
 
 
 @app.post("/conversations/{conversation_id}/extract")

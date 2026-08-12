@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wsl -e bash -lc \"cd /mnt/c/Project/Eld-care-assist && source .venv/bin/activate && grep -n 'app-message\\\\|app_message\\\\|createDataChannel\\\\|create_data_channel\\\\|datachannel\\\\|DataChannel' .venv/lib/python3.12/site-packages/pipecat/transports/smallwebrtc/connection.py | head -40\")",
+      "Bash(wsl -e bash -lc \"cat /tmp/uvicorn.log 2>&1 | tail -60\")",
+      "Bash(wsl -e bash -lc \"ps aux | grep uvicorn | grep -v grep; echo ---; sleep 5; cat /tmp/uvicorn.log; echo ---; curl -sv http://localhost:8000/health 2>&1 | tail -20\")"
+    ]
+  }
+}

@@ -6,3 +6,5 @@ schedule
 fastapi
 uvicorn[standard]
 python-multipart
+pipecat-ai[webrtc,groq,silero]
+chromadb
