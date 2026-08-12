@@ -1,0 +1,9 @@
+torch>=2.0
+transformers>=4.35
+librosa>=0.10
+soundfile>=0.12
+numpy>=1.24
+matplotlib>=3.7
+fastapi>=0.100
+uvicorn>=0.23
+huggingface_hub>=0.20

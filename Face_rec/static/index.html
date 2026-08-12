@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elderly Mood Monitor</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #fff; --ink: #1f2933; --muted: #6b7280;
+    --line: #e3e8ee; --accent: #2563eb; --good: #16a34a; --warn: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px; background: var(--card); border-bottom: 1px solid var(--line);
+  }
+  h1 { margin: 0; font-size: 22px; }
+  .dot { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .dot.live { color: var(--good); }
+  nav { display: flex; gap: 6px; padding: 14px 28px 0; }
+  nav button {
+    border: none; background: transparent; font: inherit; font-weight: 600;
+    padding: 10px 18px; border-radius: 8px 8px 0 0; cursor: pointer;
+    color: var(--muted);
+  }
+  nav button.on { background: var(--card); color: var(--ink); }
+  main { padding: 0 28px 32px; }
+  .panel { display: none; background: var(--card); border: 1px solid var(--line);
+           border-radius: 0 10px 10px 10px; padding: 22px; }
+  .panel.on { display: block; }
+  .row { display: flex; gap: 22px; flex-wrap: wrap; }
+  video, #stream {
+    width: 640px; max-width: 100%; border-radius: 10px; background: #111418;
+    display: block;
+  }
+  .side { flex: 1; min-width: 260px; }
+  .mood { font-size: 40px; font-weight: 700; margin: 4px 0 10px; }
+  .label { font-size: 11px; font-weight: 700; color: var(--muted);
+           letter-spacing: .06em; }
+  .bar { height: 20px; background: #eef2f6; border-radius: 999px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent);
+             transition: width .25s; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  button.action {
+    font: inherit; font-weight: 700; font-size: 16px; padding: 14px 20px;
+    width: 100%; border: none; border-radius: 10px; cursor: pointer;
+    background: var(--accent); color: #fff; margin-top: 18px;
+  }
+  button.action.stop { background: var(--warn); }
+  .opts { margin-top: 16px; display: grid; grid-template-columns: auto auto;
+          gap: 10px; align-items: center; color: var(--muted); font-size: 14px; }
+  .opts input { width: 70px; padding: 6px; border: 1px solid var(--line);
+                border-radius: 6px; font: inherit; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr));
+           gap: 14px; margin-bottom: 18px; }
+  .c { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .c b { display: block; font-size: 22px; margin-top: 4px; }
+  .alert { background: #fef2f2; color: var(--warn); border: 1px solid #fecaca;
+           border-radius: 10px; padding: 14px 16px; font-weight: 600;
+           margin-bottom: 16px; }
+  img.chart { width: 100%; border-radius: 8px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px;
+             flex-wrap: wrap; }
+  select, a.btn, button.ghost {
+    font: inherit; padding: 8px 14px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fff; color: var(--ink);
+    cursor: pointer; text-decoration: none;
+  }
+  .note { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+  .err { color: var(--warn); font-size: 13px; margin-top: 10px; }
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 32px;
+          text-align: center; transition: .15s; }
+  .drop.over { border-color: var(--accent); background: #f0f6ff; }
+  .prob { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .prob span:first-child { width: 90px; font-size: 13px; color: var(--muted); }
+  .prob .track { flex: 1; height: 10px; background: #eef2f6; border-radius: 999px; }
+  .prob .track i { display: block; height: 100%; border-radius: 999px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Elderly Mood Monitor</h1>
+  <span class="dot" id="dot">● Stopped</span>
+</header>
+
+<nav>
+  <button class="on" data-tab="live">Live Monitor</button>
+  <button data-tab="photo">Upload Photo</button>
+  <button data-tab="today">Today</button>
+  <button data-tab="history">History</button>
+</nav>
+
+<main>
+  <section class="panel on" id="live">
+    <div class="row">
+      <img id="stream" src="/video" alt="camera view" width="640" height="480">
+      <div class="side">
+        <div class="label">CURRENT MOOD</div>
+        <div class="mood" id="mood">—</div>
+        <div class="bar"><i id="conf"></i></div>
+        <div class="sub" id="confTxt">not running</div>
+
+        <div class="sub" id="samples" style="margin-top:16px">Readings this session: 0</div>
+        <div class="sub" id="speed">Speed: —</div>
+
+        <div class="alert" id="liveAlert" style="display:none"></div>
+
+        <button class="action" id="toggle">Start Monitoring</button>
+        <div class="err" id="err"></div>
+
+        <div class="opts">
+          <span>Log a reading every</span>
+          <span><input type="number" id="interval" value="5" min="1" max="60"> sec</span>
+          <span>Camera number</span>
+          <span><input type="number" id="camera" value="0" min="0" max="4"></span>
+        </div>
+
+        <p class="note">
+          Privacy: only mood labels and times are saved. No photos or video are
+          ever written to disk, and nothing leaves this computer.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="photo">
+    <div id="drop" class="drop">
+      <p style="margin:0 0 6px"><b>Drop a photo here</b> or</p>
+      <input type="file" id="file" accept="image/*" hidden>
+      <button class="ghost" onclick="document.getElementById('file').click()">Choose a photo</button>
+      <p class="sub" style="margin-top:10px">JPG or PNG. The photo is analysed on this
+        computer and is never saved or uploaded anywhere.</p>
+      <label class="sub" style="display:block;margin-top:8px">
+        <input type="checkbox" id="logShot"> also record the result in today's log
+      </label>
+    </div>
+    <div id="shotErr" class="err"></div>
+    <div class="row" id="shotOut" style="margin-top:18px; display:none">
+      <img id="shotImg" alt="analysed photo"
+           style="width:640px;max-width:100%;border-radius:10px">
+      <div class="side" id="shotInfo"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="today">
+    <div id="todayAlert"></div>
+    <div class="cards" id="todayCards"></div>
+    <div class="toolbar"><button class="ghost" onclick="loadToday()">Refresh</button></div>
+    <img class="chart" id="todayChart" alt="mood charts for today">
+  </section>
+
+  <section class="panel" id="history">
+    <div class="toolbar">
+      <label for="daySel">Day:</label>
+      <select id="daySel"></select>
+      <button class="ghost" onclick="loadDays()">Reload</button>
+      <a class="btn" id="exportLink" href="#">Export CSV</a>
+    </div>
+    <div class="cards" id="histCards"></div>
+    <img class="chart" id="histChart" alt="mood charts for the selected day">
+  </section>
+</main>
+
+<script>
+const COLORS = {
+  happiness:"#16a34a", surprise:"#d4a017", neutral:"#9ca3af", contempt:"#7c6fd4",
+  disgust:"#4f86c6", sadness:"#e08a3c", fear:"#c56fc5", anger:"#dc2626"
+};
+const $ = id => document.getElementById(id);
+let running = false;
+
+document.querySelectorAll("nav button").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll("nav button").forEach(x => x.classList.remove("on"));
+    document.querySelectorAll(".panel").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    $(b.dataset.tab).classList.add("on");
+    if (b.dataset.tab === "today") loadToday();
+    if (b.dataset.tab === "history") loadDays();
+  };
+});
+
+$("toggle").onclick = async () => {
+  $("err").textContent = "";
+  if (running) {
+    await fetch("/api/stop", {method:"POST"});
+  } else {
+    const cam = $("camera").value, iv = $("interval").value;
+    const r = await fetch(`/api/start?camera=${cam}&interval=${iv}`, {method:"POST"});
+    const j = await r.json();
+    if (!j.ok) { $("err").textContent = j.message; return; }
+  }
+  poll();
+};
+
+async function poll() {
+  let s;
+  try { s = await (await fetch("/api/status")).json(); } catch(e) { return; }
+  running = s.running;
+  $("dot").textContent = running ? "● Monitoring" : "● Stopped";
+  $("dot").className = "dot" + (running ? " live" : "");
+  $("toggle").textContent = running ? "Stop Monitoring" : "Start Monitoring";
+  $("toggle").className = "action" + (running ? " stop" : "");
+
+  const c = s.current;
+  if (running && c && c.emotion) {
+    $("mood").textContent = c.emotion[0].toUpperCase() + c.emotion.slice(1);
+    $("mood").style.color = COLORS[c.emotion] || "#1f2933";
+    $("conf").style.width = c.confidence + "%";
+    $("conf").style.background = COLORS[c.emotion] || "#2563eb";
+    $("confTxt").textContent = "confidence " + Math.round(c.confidence) + "%";
+  } else if (running) {
+    $("mood").textContent = "No face";
+    $("mood").style.color = "#6b7280";
+    $("conf").style.width = "0";
+    $("confTxt").textContent = "looking for a face…";
+  } else {
+    $("mood").textContent = "—";
+    $("mood").style.color = "#1f2933";
+    $("conf").style.width = "0";
+    $("confTxt").textContent = "not running";
+  }
+  $("samples").textContent = "Readings this session: " + s.session_samples;
+  $("speed").textContent = s.fps ? `Speed: ${s.ms_per_frame} ms/frame (${s.fps} fps, CPU only)` : "Speed: —";
+}
+setInterval(poll, 600);
+poll();
+
+function cards(el, s) {
+  if (!s || s.empty) { el.innerHTML = '<div class="c">No readings for this day yet.</div>'; return; }
+  const col = s.wellbeing >= 55 ? "#16a34a" : (s.wellbeing < 42 ? "#dc2626" : "#d97706");
+  el.innerHTML = `
+    <div class="c"><span class="label">WELLBEING SCORE</span><b style="color:${col}">${s.wellbeing}/100</b></div>
+    <div class="c"><span class="label">MOST OF THE DAY</span><b style="color:${COLORS[s.dominant]||"#1f2933"}">${s.dominant[0].toUpperCase()+s.dominant.slice(1)}</b></div>
+    <div class="c"><span class="label">OBSERVED</span><b>${s.first_seen} – ${s.last_seen}</b></div>
+    <div class="c"><span class="label">READINGS</span><b>${s.samples}</b></div>`;
+}
+
+async function loadToday() {
+  const s = await (await fetch("/api/summary")).json();
+  cards($("todayCards"), s);
+  $("todayAlert").innerHTML = (s.alert && s.alert.message)
+    ? `<div class="alert">⚠ ${s.alert.message}</div>` : "";
+  $("todayChart").src = "/api/chart?_t=" + Date.now();
+}
+
+async function loadDays() {
+  const j = await (await fetch("/api/days")).json();
+  const sel = $("daySel"), prev = sel.value;
+  sel.innerHTML = j.days.map(d => `<option>${d}</option>`).join("");
+  if (j.days.includes(prev)) sel.value = prev;
+  if (j.days.length) loadHistory(); else cards($("histCards"), null);
+}
+
+async function loadHistory() {
+  const d = $("daySel").value;
+  if (!d) return;
+  const s = await (await fetch("/api/summary?day=" + d)).json();
+  cards($("histCards"), s);
+  $("histChart").src = `/api/chart?day=${d}&_t=` + Date.now();
+  $("exportLink").href = "/api/export?day=" + d;
+}
+$("daySel").onchange = loadHistory;
+
+// ---- photo upload ----
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("over");
+}));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("over");
+}));
+drop.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0];
+  if (f) analyzePhoto(f);
+});
+$("file").onchange = e => { if (e.target.files[0]) analyzePhoto(e.target.files[0]); };
+
+async function analyzePhoto(file) {
+  $("shotErr").textContent = "";
+  $("shotOut").style.display = "none";
+  if (!file.type.startsWith("image/")) {
+    $("shotErr").textContent = "That is not an image file."; return;
+  }
+  const log = $("logShot").checked ? 1 : 0;
+  let j;
+  try {
+    const r = await fetch("/api/analyze?log=" + log, { method: "POST", body: file });
+    j = await r.json();
+  } catch (err) {
+    $("shotErr").textContent = "Upload failed: " + err; return;
+  }
+  if (!j.ok) { $("shotErr").textContent = j.message; return; }
+  if (!j.faces) { $("shotErr").textContent = j.message || "No face found."; return; }
+
+  $("shotImg").src = j.image;
+  const m = j.results[0];
+  $("shotInfo").innerHTML =
+    `<div class="label">DETECTED MOOD</div>
+     <div class="mood" style="color:${COLORS[m.emotion]||"#1f2933"}">
+       ${m.emotion[0].toUpperCase() + m.emotion.slice(1)}</div>
+     <div class="sub">confidence ${m.confidence}%</div>
+     <div style="margin-top:18px" class="label">BREAKDOWN</div>` +
+    m.top.map(t => `
+      <div class="prob"><span>${t.emotion}</span>
+        <span class="track"><i style="width:${t.pct}%;background:${COLORS[t.emotion]||"#999"}"></i></span>
+        <span style="width:44px;text-align:right;font-size:13px">${t.pct}%</span>
+      </div>`).join("") +
+    (j.faces > 1 ? `<p class="sub">${j.faces} faces found; showing the largest.</p>` : "") +
+    (j.logged ? `<p class="sub">Recorded in today's log.</p>` : "");
+  $("shotOut").style.display = "flex";
+}
+</script>
+</body>
+</html>

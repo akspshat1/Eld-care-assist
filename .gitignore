@@ -1,0 +1,84 @@
+# ---- secrets -------------------------------------------------------------
+# The API key lives in .env and only there. config.py holds no secrets and IS
+# committed, so teammates get working settings on clone.
+.env
+.env.local
+*.env.local
+
+# ---- python --------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- downloaded model weights --------------------------------------------
+# Face_rec's models are ~34 MB total and are COMMITTED, so the app is
+# clone-and-run (see the negation below).
+#
+# voice_rec's model.safetensors is 1.21 GB. GitHub hard-rejects any file over
+# 100 MB, and Git LFS's free tier is 1 GB, so it cannot be committed at all.
+# Get it back with:  cd voice_rec && python download_models.py
+voice_rec/models/
+med_mgmt/models/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.tflite
+*.gguf
+
+# Keep Face_rec's small ONNX models in the repo.
+!Face_rec/models/
+!Face_rec/models/*.onnx
+
+# ---- local databases and app data ----------------------------------------
+**/data/*.db
+**/data/*.sqlite
+**/data/*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+# ChromaDB persistent store (Converse_2way) - rebuilt on first run
+Converse_2way/data/chroma/
+**/chroma/
+
+# ---- node / next.js (Converse_2way/web) ----------------------------------
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- caches from the ML/audio stacks -------------------------------------
+.cache/
+**/.cache/huggingface/
+.huggingface/
+torch_extensions/
+
+# ---- generated / scratch output ------------------------------------------
+preview_*.png
+*_annotated.jpg
+*_annotated.png
+mood_*.csv
+medications.csv
+
+# ---- editor / OS ---------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

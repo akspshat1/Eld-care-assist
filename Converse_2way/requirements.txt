@@ -1,0 +1,10 @@
+streamlit
+groq
+python-dotenv
+pyttsx3
+schedule
+fastapi
+uvicorn[standard]
+python-multipart
+pipecat-ai[webrtc,groq,silero]
+chromadb

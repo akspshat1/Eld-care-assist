@@ -1,0 +1,7 @@
+data/*.db
+__pycache__/
+*.pyc
+
+# model.safetensors is 1.21 GB -- past GitHub's 100 MB per-file limit, so the
+# weights stay out of the repo. Get them with: python download_models.py
+models/

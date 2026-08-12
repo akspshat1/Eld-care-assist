@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Medication Manager</title>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --ink:#1f2933; --muted:#6b7280; --line:#e3e8ee;
+          --accent:#2563eb; --good:#16a34a; --warn:#dc2626; --amber:#d97706; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-size:17px;
+         font-family:"Segoe UI","Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",
+                     system-ui,sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:16px;
+           padding:18px 28px; background:var(--card); border-bottom:1px solid var(--line);
+           flex-wrap:wrap; }
+  h1 { margin:0; font-size:24px; }
+  h1 small { display:block; font-size:12px; color:var(--muted); font-weight:400; }
+  .hright { display:flex; align-items:center; gap:14px; }
+  .langtog { display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .langtog button { border:none; background:#fff; font:inherit; font-size:14px;
+                    font-weight:700; padding:8px 14px; cursor:pointer; color:var(--muted); }
+  .langtog button.on { background:var(--accent); color:#fff; }
+  nav { display:flex; gap:6px; padding:14px 28px 0; flex-wrap:wrap; }
+  nav button { border:none; background:transparent; font:inherit; font-weight:700;
+               padding:12px 20px; border-radius:8px 8px 0 0; cursor:pointer; color:var(--muted); }
+  nav button.on { background:var(--card); color:var(--ink); }
+  main { padding:0 28px 40px; }
+  .panel { display:none; background:var(--card); border:1px solid var(--line);
+           border-radius:0 10px 10px 10px; padding:26px; }
+  .panel.on { display:block; }
+  .label { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.05em; }
+  .sub { color:var(--muted); font-size:14px; }
+  .banner { border-radius:10px; padding:16px 18px; margin-bottom:18px; font-weight:600; }
+  .banner.err { background:#fef2f2; color:var(--warn); border:1px solid #fecaca; }
+  .banner.info { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+  .banner.warnbox { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+  button.btn { font:inherit; font-weight:700; border:none; border-radius:10px;
+               padding:14px 20px; cursor:pointer; background:var(--accent); color:#fff; }
+  button.btn.grey { background:#e5e9ef; color:var(--ink); }
+  button.btn.green { background:var(--good); }
+  button.btn.red { background:var(--warn); }
+  button.btn:disabled { background:#c7ced6; cursor:not-allowed; }
+  button.ghost, a.btn2, select, input[type=text], input[type=time], input[type=date], textarea {
+    font:inherit; padding:10px 14px; border:1px solid var(--line); border-radius:8px;
+    background:#fff; color:var(--ink); }
+  button.ghost, a.btn2 { cursor:pointer; text-decoration:none; }
+  textarea { width:100%; min-height:170px; resize:vertical; }
+  .drop { border:2px dashed var(--line); border-radius:12px; padding:30px; text-align:center; }
+  .drop.over { border-color:var(--accent); background:#f0f6ff; }
+  .dose { display:flex; align-items:center; gap:16px; border:1px solid var(--line);
+          border-radius:12px; padding:16px 18px; margin-bottom:12px; }
+  .dose .time { font-size:26px; font-weight:700; width:96px; font-variant-numeric:tabular-nums; }
+  .dose .info { flex:1; min-width:180px; }
+  .dose .info b { font-size:19px; }
+  .dose.taken { background:#f0fdf4; border-color:#bbf7d0; }
+  .dose.skipped { background:#f8fafc; opacity:.72; }
+  .dose.overdue { background:#fef2f2; border-color:#fecaca; }
+  .pill { display:inline-block; font-size:12px; font-weight:700; padding:3px 10px;
+          border-radius:999px; background:#eef2f6; color:var(--muted); margin-left:8px; }
+  .pill.taken { background:#dcfce7; color:#15803d; }
+  .pill.skipped { background:#e5e9ef; color:#475569; }
+  .pill.late { background:#fee2e2; color:#b91c1c; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
+  .c { border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .c b { display:block; font-size:24px; margin-top:4px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); font-size:15px; }
+  th { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .rev { border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  .rev .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-top:10px; }
+  .rev .grid label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .rev input { width:100%; }
+  .conf { font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; }
+  .conf.high { background:#dcfce7; color:#15803d; }
+  .conf.medium { background:#fef3c7; color:#92400e; }
+  .conf.low { background:#fee2e2; color:#b91c1c; }
+  .bigdue { border:2px solid var(--warn); background:#fef2f2; border-radius:14px;
+            padding:22px; margin-bottom:18px; }
+  .bigdue h2 { margin:0 0 4px; font-size:30px; color:var(--warn); }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .disc { font-size:13px; color:var(--muted); line-height:1.7; margin-top:22px;
+          border-top:1px solid var(--line); padding-top:16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 data-i18n="title">Medication Manager<small data-i18n="subtitle">Upload a prescription, get reminders on time</small></h1>
+  <div class="hright">
+    <span class="sub" id="clock"></span>
+    <div class="langtog">
+      <button id="langEn" class="on" onclick="setLang('en')">EN</button>
+      <button id="langJa" onclick="setLang('ja')">日本語</button>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button class="on" data-tab="today" data-i18n="tabToday">Today</button>
+  <button data-tab="add" data-i18n="tabAdd">Add Prescription</button>
+  <button data-tab="meds" data-i18n="tabMeds">My Medications</button>
+  <button data-tab="history" data-i18n="tabHistory">History</button>
+  <button data-tab="settings" data-i18n="tabSettings">Settings</button>
+</nav>
+
+<main>
+  <section class="panel on" id="today">
+    <div id="dueArea"></div>
+    <div class="cards" id="todayCards"></div>
+    <div id="todayList"></div>
+    <div id="prnArea"></div>
+  </section>
+
+  <section class="panel" id="add">
+    <div id="keyWarn"></div>
+    <p class="sub" data-i18n="addIntro">Upload a photo of the prescription, or paste the text. The AI reads it into a draft — you check and correct it before anything is saved.</p>
+
+    <div id="drop" class="drop" style="margin:16px 0">
+      <p style="margin:0 0 10px"><b data-i18n="dropHere">Drop a photo of the prescription here</b> <span data-i18n="or">or</span></p>
+      <input type="file" id="file" accept="image/*" hidden>
+      <button class="ghost" data-i18n="choose" onclick="document.getElementById('file').click()">Choose a photo</button>
+      <p class="sub" data-i18n="photoNote">A clear, well-lit photo reads best. 処方箋・薬袋・お薬手帳 も読めます。</p>
+    </div>
+
+    <div id="preview" style="display:none;margin:16px 0">
+      <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
+        <img id="previewImg" alt="uploaded prescription"
+             style="max-width:340px;max-height:300px;border-radius:10px;border:1px solid var(--line)">
+        <div style="flex:1;min-width:200px">
+          <div class="label" id="previewName"></div>
+          <div class="sub" id="previewState" style="margin-top:6px"></div>
+          <button class="ghost" style="margin-top:12px" id="clearPhoto"
+                  onclick="clearPhoto()"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="label" data-i18n="orPaste">OR PASTE THE PRESCRIPTION TEXT</div>
+    <textarea id="rxText" placeholder="Amlodipine 5mg — 1 tablet once daily in the morning, 30 days&#10;&#10;アムロジピン錠5mg 1回1錠 1日1回朝食後 14日分"></textarea>
+    <div style="margin-top:12px">
+      <button class="btn" id="readBtn" data-i18n="readBtn" onclick="extractText()">Read with AI</button>
+      <span class="sub" id="addStatus" style="margin-left:12px"></span>
+    </div>
+
+    <div id="reviewArea" style="margin-top:26px"></div>
+
+    <p class="disc" data-i18n="disclaimer">This tool helps you keep track — it does not replace your doctor or pharmacist. AI can misread a prescription, so always check every field against the original before saving, and follow the instructions you were actually given.</p>
+  </section>
+
+  <section class="panel" id="meds">
+    <div id="medsList"></div>
+  </section>
+
+  <section class="panel" id="history">
+    <div class="cards" id="histCards"></div>
+    <div style="margin-bottom:14px">
+      <a class="btn2" href="/api/export?days=30" data-i18n="export">Export CSV</a>
+    </div>
+    <div id="histTable"></div>
+  </section>
+
+  <section class="panel" id="settings">
+    <div id="settingsBody"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const T = {
+ en: {
+  title:"Medication Manager", subtitle:"Upload a prescription, get reminders on time",
+  tabToday:"Today", tabAdd:"Add Prescription", tabMeds:"My Medications",
+  tabHistory:"History", tabSettings:"Settings",
+  addIntro:"Upload a photo of the prescription, or paste the text. The AI reads it into a draft — you check and correct it before anything is saved.",
+  dropHere:"Drop a photo of the prescription here", or:"or", choose:"Choose a photo",
+  photoNote:"A clear, well-lit photo reads best. Japanese prescriptions are supported.",
+  orPaste:"OR PASTE THE PRESCRIPTION TEXT", readBtn:"Read with AI",
+  disclaimer:"This tool helps you keep track — it does not replace your doctor or pharmacist. AI can misread a prescription, so always check every field against the original before saving, and follow the instructions you were actually given.",
+  export:"Export CSV",
+  reading:"Reading…", noMeds:"No medications saved yet. Add a prescription to get started.",
+  nothingToday:"Nothing scheduled today.",
+  timeToTake:"Time to take", takeNow:"Take now", taken:"Taken", skip:"Skip", undo:"Undo",
+  snooze:"Remind me in 10 min", late:m=>`${m} min late`, overdue:"OVERDUE",
+  nextDose:d=>`Next dose at ${d}`, noNext:"No more doses today",
+  scheduled:"SCHEDULED", takenN:"TAKEN", missed:"MISSED", adherence:"ON TIME",
+  asNeeded:"As needed", logDose:"Log a dose", loggedPrn:"Logged.",
+  review:"Check this before saving", saveAll:"Save these medications",
+  cancel:"Cancel", saved:n=>`Saved ${n} medication(s).`,
+  name:"Name", strength:"Strength", dose:"Dose", times:"Times (HH:MM, comma separated)",
+  duration:"Days", notes:"Notes", remove:"Remove",
+  confHigh:"high confidence", confMedium:"check this", confLow:"please verify",
+  noMedsFound:"No medications could be read from that. Try a clearer photo, or paste the text instead.",
+  showRead:"Show the text read from the photo",
+  clearPhoto:"Use a different photo",
+  photoRead:n=>`Read ${n} medication(s) from the photo — check them below.`,
+  photoFailed:"Could not read that photo.",
+  delete:"Delete", confirmDelete:n=>`Delete ${n}? This also removes its history.`,
+  active:"Active", paused:"Paused", pause:"Pause", resume:"Resume",
+  everyDay:"every day", noKey:"Groq API key not set",
+  notifOn:"Reminders on", notifOff:"Enable browser reminders",
+  day:"Day", timeCol:"Time", medCol:"Medication", statusCol:"Status",
+  pending:"pending", skipped:"skipped"
+ },
+ ja: {
+  title:"服薬管理", subtitle:"処方箋を読み込んで、時間どおりにお知らせします",
+  tabToday:"今日", tabAdd:"処方箋を追加", tabMeds:"お薬一覧",
+  tabHistory:"履歴", tabSettings:"設定",
+  addIntro:"処方箋の写真をアップロードするか、文字を貼り付けてください。AIが下書きを作りますので、保存する前に必ずご確認ください。",
+  dropHere:"処方箋の写真をここにドロップ", or:"または", choose:"写真を選ぶ",
+  photoNote:"明るくはっきりした写真がよく読めます。処方箋・薬袋・お薬手帳に対応しています。",
+  orPaste:"または処方箋の内容を貼り付け", readBtn:"AIで読み取る",
+  disclaimer:"このアプリは記録の補助です。医師や薬剤師の指示に代わるものではありません。AIは読み間違えることがあります。保存する前に必ず原本と照らし合わせ、実際に受けた指示に従ってください。",
+  export:"CSVで書き出す",
+  reading:"読み取り中…", noMeds:"まだお薬が登録されていません。処方箋を追加してください。",
+  nothingToday:"今日の予定はありません。",
+  timeToTake:"お薬の時間です", takeNow:"今すぐ服用", taken:"飲みました", skip:"飲まない", undo:"取り消す",
+  snooze:"10分後に再通知", late:m=>`${m}分遅れ`, overdue:"時間を過ぎています",
+  nextDose:d=>`次は ${d} です`, noNext:"今日の予定は終わりました",
+  scheduled:"予定", takenN:"服用済み", missed:"飲み忘れ", adherence:"実行率",
+  asNeeded:"頓服", logDose:"服用を記録", loggedPrn:"記録しました。",
+  review:"保存する前にご確認ください", saveAll:"このお薬を保存する",
+  cancel:"やめる", saved:n=>`${n}件を保存しました。`,
+  name:"薬の名前", strength:"強さ", dose:"1回量", times:"時刻（HH:MM、カンマ区切り）",
+  duration:"日数", notes:"メモ", remove:"削除",
+  confHigh:"確信度：高", confMedium:"要確認", confLow:"必ずご確認ください",
+  noMedsFound:"お薬を読み取れませんでした。もっとはっきりした写真か、文字を貼り付けてお試しください。",
+  showRead:"写真から読み取った文字を表示",
+  clearPhoto:"別の写真を使う",
+  photoRead:n=>`写真から${n}件のお薬を読み取りました。下でご確認ください。`,
+  photoFailed:"この写真を読み取れませんでした。",
+  delete:"削除", confirmDelete:n=>`${n} を削除しますか？履歴も消えます。`,
+  active:"服用中", paused:"停止中", pause:"一時停止", resume:"再開",
+  everyDay:"毎日", noKey:"Groq APIキーが設定されていません",
+  notifOn:"通知オン", notifOff:"ブラウザ通知を有効にする",
+  day:"日付", timeCol:"時刻", medCol:"お薬", statusCol:"状態",
+  pending:"未", skipped:"飲まない"
+ }
+};
+
+let lang = localStorage.getItem("med_lang") || "en";
+const t = k => T[lang][k];
+let health = null, draft = null, snoozed = {};
+
+function setLang(l) {
+  lang = l; localStorage.setItem("med_lang", l);
+  document.documentElement.lang = l;
+  $("langEn").className = l === "en" ? "on" : "";
+  $("langJa").className = l === "ja" ? "on" : "";
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const v = T[lang][el.dataset.i18n];
+    if (typeof v !== "string") return;
+    if (el.tagName === "H1") {
+      el.childNodes[0].nodeValue = T[lang].title;
+      el.querySelector("small").textContent = T[lang].subtitle;
+    } else el.textContent = v;
+  });
+  refreshCurrentTab();
+  if (draft) renderReview();
+}
+
+document.querySelectorAll("nav button").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll("nav button").forEach(x => x.classList.remove("on"));
+    document.querySelectorAll(".panel").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); $(b.dataset.tab).classList.add("on");
+    refreshCurrentTab();
+  };
+});
+const currentTab = () => document.querySelector("nav button.on").dataset.tab;
+function refreshCurrentTab() {
+  const tab = currentTab();
+  if (tab === "today") loadToday();
+  if (tab === "meds") loadMeds();
+  if (tab === "history") loadHistory();
+  if (tab === "settings") renderSettings();
+  if (tab === "add") renderKeyWarn();
+}
+
+// ---------- today ----------
+async function loadToday() {
+  const s = await (await fetch("/api/today")).json();
+  $("todayCards").innerHTML = `
+    <div class="c"><span class="label">${t("scheduled")}</span><b>${s.total}</b></div>
+    <div class="c"><span class="label">${t("takenN")}</span><b style="color:var(--good)">${s.taken}</b></div>
+    <div class="c"><span class="label">${t("missed")}</span><b style="color:${s.missed?"var(--warn)":"var(--ink)"}">${s.missed}</b></div>
+    <div class="c"><span class="label">${t("adherence")}</span><b>${s.adherence === null ? "—" : s.adherence + "%"}</b></div>`;
+
+  $("todayList").innerHTML = s.doses.length
+    ? s.doses.map(doseRow).join("")
+    : `<p class="sub">${t("nothingToday")}</p>`;
+
+  $("prnArea").innerHTML = s.as_needed.length ? `
+    <h3 style="margin-top:26px">${t("asNeeded")}</h3>` +
+    s.as_needed.map(m => `
+      <div class="dose"><div class="info"><b>${esc(m.name)}</b>
+        <span class="sub">${esc(m.dose_amount||"")} ${esc(m.strength||"")}</span></div>
+        <button class="btn" onclick="logPrn(${m.id})">${t("logDose")}</button></div>`).join("")
+    : "";
+  loadDue();
+}
+
+function doseRow(d) {
+  const cls = d.status === "taken" ? "taken" : d.status === "skipped" ? "skipped" : "";
+  const pill = d.status === "taken" ? `<span class="pill taken">${t("taken")}</span>`
+             : d.status === "skipped" ? `<span class="pill skipped">${t("skipped")}</span>` : "";
+  const btns = d.status === "pending"
+    ? `<button class="btn green" onclick="mark(${d.med_id},'${d.day}','${d.slot}','taken')">${t("taken")}</button>
+       <button class="btn grey" onclick="mark(${d.med_id},'${d.day}','${d.slot}','skipped')">${t("skip")}</button>`
+    : `<button class="btn grey" onclick="mark(${d.med_id},'${d.day}','${d.slot}','undo')">${t("undo")}</button>`;
+  return `<div class="dose ${cls}">
+      <div class="time">${d.slot}</div>
+      <div class="info"><b>${esc(d.name)}</b>${pill}<br>
+        <span class="sub">${esc([d.dose_amount, d.strength, d.notes].filter(Boolean).join(" · "))}</span></div>
+      <div class="actions" style="margin:0">${btns}</div></div>`;
+}
+
+async function loadDue() {
+  let j;
+  try { j = await (await fetch("/api/due")).json(); } catch (e) { return; }
+  const live = j.due.filter(d => !snoozed[key(d)] || Date.now() > snoozed[key(d)]);
+
+  $("dueArea").innerHTML = live.length ? live.map(d => `
+    <div class="bigdue">
+      <h2>${t("timeToTake")}</h2>
+      <div style="font-size:26px;font-weight:700;margin:6px 0">${esc(d.name)}
+        <span class="sub" style="font-size:16px">${esc([d.dose_amount,d.strength].filter(Boolean).join(" · "))}</span></div>
+      <div class="sub">${d.slot}${d.late_minutes > 1 ? " · " + t("late")(d.late_minutes) : ""}
+        ${d.overdue ? `<span class="pill late">${t("overdue")}</span>` : ""}</div>
+      <div class="actions">
+        <button class="btn green" onclick="mark(${d.med_id},'${d.day}','${d.slot}','taken')">${t("taken")}</button>
+        <button class="btn grey" onclick="snooze('${key(d)}')">${t("snooze")}</button>
+        <button class="btn grey" onclick="mark(${d.med_id},'${d.day}','${d.slot}','skipped')">${t("skip")}</button>
+      </div></div>`).join("")
+    : (j.next ? `<div class="banner info">${t("nextDose")(j.next.slot)} — ${esc(j.next.name)}</div>`
+              : `<div class="banner info">${t("noNext")}</div>`);
+
+  live.forEach(d => notify(d));
+}
+
+const key = d => `${d.med_id}|${d.day}|${d.slot}`;
+function snooze(k) { snoozed[k] = Date.now() + 10 * 60 * 1000; loadDue(); }
+
+async function mark(med_id, day, slot, status) {
+  await fetch("/api/dose", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ med_id, day, slot, status }) });
+  loadToday();
+}
+async function logPrn(id) { await fetch("/api/prn/" + id, {method:"POST"}); loadToday(); }
+
+// ---------- reminders ----------
+let notified = {};
+function notify(d) {
+  const k = key(d);
+  if (notified[k]) return;
+  notified[k] = true;
+  beep();
+  if (window.Notification && Notification.permission === "granted") {
+    new Notification(t("timeToTake"), {
+      body: `${d.name} ${d.dose_amount || ""} (${d.slot})`, tag: k });
+  }
+}
+function beep() {
+  try {
+    const c = new (window.AudioContext || window.webkitAudioContext)();
+    const o = c.createOscillator(), g = c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.frequency.value = 880; o.type = "sine";
+    g.gain.setValueAtTime(0.001, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.25, c.currentTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.9);
+    o.start(); o.stop(c.currentTime + 1);
+    setTimeout(() => c.close(), 1400);
+  } catch (e) {}
+}
+
+// ---------- add / extract ----------
+function renderKeyWarn() {
+  $("keyWarn").innerHTML = (health && !health.groq_ready)
+    ? `<div class="banner err">${t("noKey")}<br><span class="sub">${esc(health.message||"")}</span></div>` : "";
+}
+
+const drop = $("drop");
+["dragenter","dragover"].forEach(e => drop.addEventListener(e, ev => {
+  ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(e => drop.addEventListener(e, ev => {
+  ev.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", ev => { if (ev.dataTransfer.files[0]) extractImage(ev.dataTransfer.files[0]); });
+$("file").onchange = ev => { if (ev.target.files[0]) extractImage(ev.target.files[0]); };
+
+async function extractText() { await runExtract("/api/extract/text",
+  { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ text: $("rxText").value }) }); }
+
+async function extractImage(file) {
+  // Show the photo straight away so it is obvious the upload landed.
+  $("previewImg").src = URL.createObjectURL(file);
+  $("previewName").textContent = file.name || "photo";
+  $("previewState").textContent = t("reading");
+  $("clearPhoto").textContent = t("clearPhoto");
+  $("preview").style.display = "block";
+  $("drop").style.display = "none";
+
+  const ok = await runExtract("/api/extract/image",
+    { method:"POST", headers:{"Content-Type": file.type || "image/jpeg"}, body: file });
+  $("previewState").textContent = ok
+    ? t("photoRead")((draft && draft.medications ? draft.medications.length : 0))
+    : t("photoFailed");
+}
+
+function clearPhoto() {
+  $("preview").style.display = "none";
+  $("drop").style.display = "block";
+  $("file").value = "";
+  $("previewImg").src = "";
+  draft = null;
+  $("reviewArea").innerHTML = "";
+  $("addStatus").textContent = "";
+}
+
+async function runExtract(url, opts) {
+  $("addStatus").textContent = t("reading");
+  $("readBtn").disabled = true;
+  $("reviewArea").innerHTML = "";
+  try {
+    const j = await (await fetch(url, opts)).json();
+    if (!j.ok) {
+      $("addStatus").innerHTML = `<span style="color:var(--warn)">${esc(j.message)}</span>`;
+      return false;
+    }
+    draft = j;
+    $("addStatus").textContent = "";
+    renderReview();
+    return true;
+  } catch (e) {
+    $("addStatus").innerHTML = `<span style="color:var(--warn)">${esc(String(e))}</span>`;
+    return false;
+  } finally { $("readBtn").disabled = false; }
+}
+
+function renderReview() {
+  if (!draft) return;
+  if (!draft.medications.length) {
+    $("reviewArea").innerHTML = `<div class="banner warnbox">${t("noMedsFound")}</div>` +
+      (draft.warnings||[]).map(w => `<div class="banner warnbox">${esc(w)}</div>`).join("");
+    return;
+  }
+  $("reviewArea").innerHTML =
+    `<div class="banner warnbox"><b>${t("review")}</b></div>` +
+    (draft.warnings||[]).map(w => `<div class="banner warnbox">⚠ ${esc(w)}</div>`).join("") +
+    (draft.transcription ? `<details style="margin-bottom:14px">
+        <summary class="sub" style="cursor:pointer">${t("showRead")}</summary>
+        <pre style="white-space:pre-wrap;font-size:14px;background:#f8fafc;
+             border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:8px"
+             >${esc(draft.transcription)}</pre></details>` : "") +
+    draft.medications.map((m, i) => `
+      <div class="rev" id="rev${i}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <b style="font-size:19px">${esc(m.name)}</b>
+          <span><span class="conf ${m.confidence}">${t("conf"+cap(m.confidence))}</span>
+          <button class="ghost" style="margin-left:8px" onclick="dropMed(${i})">${t("remove")}</button></span>
+        </div>
+        ${m.frequency_text ? `<div class="sub" style="margin-top:6px">${esc(m.frequency_text)}</div>` : ""}
+        <div class="grid">
+          <div><label>${t("name")}</label><input id="f_name_${i}" value="${attr(m.name)}"></div>
+          <div><label>${t("strength")}</label><input id="f_strength_${i}" value="${attr(m.strength||"")}"></div>
+          <div><label>${t("dose")}</label><input id="f_dose_${i}" value="${attr(m.dose_amount||"")}"></div>
+          <div><label>${t("times")}</label><input id="f_times_${i}" value="${attr((m.times||[]).join(", "))}"></div>
+          <div><label>${t("duration")}</label><input id="f_days_${i}" value="${attr(m.duration_days||"")}"></div>
+          <div><label>${t("notes")}</label><input id="f_notes_${i}" value="${attr(m.notes||"")}"></div>
+        </div>
+      </div>`).join("") +
+    `<div class="actions"><button class="btn green" onclick="saveDraft()">${t("saveAll")}</button>
+     <button class="btn grey" onclick="draft=null;$('reviewArea').innerHTML=''">${t("cancel")}</button></div>`;
+}
+
+function dropMed(i) { draft.medications.splice(i, 1); renderReview(); }
+
+async function saveDraft() {
+  const meds = draft.medications.map((m, i) => ({
+    name: val(`f_name_${i}`) || m.name,
+    name_en: m.name_en,
+    strength: val(`f_strength_${i}`) || null,
+    dose_amount: val(`f_dose_${i}`) || null,
+    form: m.form, timing: m.timing, frequency_text: m.frequency_text,
+    times: val(`f_times_${i}`).split(",").map(s => s.trim()).filter(Boolean),
+    duration_days: parseInt(val(`f_days_${i}`)) || null,
+    notes: val(`f_notes_${i}`) || null,
+  }));
+  const j = await (await fetch("/api/medications", { method:"POST",
+    headers:{"Content-Type":"application/json"}, body: JSON.stringify({medications: meds}) })).json();
+  if (j.ok) {
+    draft = null;
+    $("reviewArea").innerHTML = `<div class="banner info">${t("saved")(j.saved)}</div>`;
+    $("rxText").value = "";
+  }
+}
+
+// ---------- medications ----------
+async function loadMeds() {
+  const j = await (await fetch("/api/medications")).json();
+  $("medsList").innerHTML = j.medications.length ? j.medications.map(m => `
+    <div class="dose">
+      <div class="info">
+        <b>${esc(m.name)}</b> <span class="pill ${m.active?"taken":"skipped"}">${m.active?t("active"):t("paused")}</span><br>
+        <span class="sub">${esc([m.dose_amount, m.strength, (m.times||[]).join(", ") || t("asNeeded"),
+          m.end_date ? `→ ${m.end_date}` : t("everyDay")].filter(Boolean).join(" · "))}</span>
+        ${m.notes ? `<br><span class="sub">${esc(m.notes)}</span>` : ""}
+      </div>
+      <button class="btn grey" onclick="togglePause(${m.id},${m.active?0:1})">${m.active?t("pause"):t("resume")}</button>
+      <button class="btn red" onclick="delMed(${m.id},'${attr(m.name)}')">${t("delete")}</button>
+    </div>`).join("") : `<p class="sub">${t("noMeds")}</p>`;
+}
+async function togglePause(id, active) {
+  await fetch("/api/medications/" + id, { method:"PATCH",
+    headers:{"Content-Type":"application/json"}, body: JSON.stringify({active}) });
+  loadMeds();
+}
+async function delMed(id, name) {
+  if (!confirm(t("confirmDelete")(name))) return;
+  await fetch("/api/medications/" + id, {method:"DELETE"});
+  loadMeds();
+}
+
+// ---------- history ----------
+async function loadHistory() {
+  const j = await (await fetch("/api/history?days=14")).json();
+  const days = j.history;
+  const tot = days.reduce((a,d) => a + d.total, 0);
+  const tak = days.reduce((a,d) => a + d.taken, 0);
+  const mis = days.reduce((a,d) => a + d.missed, 0);
+  $("histCards").innerHTML = `
+    <div class="c"><span class="label">${t("scheduled")}</span><b>${tot}</b></div>
+    <div class="c"><span class="label">${t("takenN")}</span><b style="color:var(--good)">${tak}</b></div>
+    <div class="c"><span class="label">${t("missed")}</span><b style="color:${mis?"var(--warn)":"var(--ink)"}">${mis}</b></div>
+    <div class="c"><span class="label">${t("adherence")}</span><b>${tot?Math.round(100*tak/tot)+"%":"—"}</b></div>`;
+
+  const rows = [];
+  days.forEach(d => d.doses.forEach(x => rows.push(
+    `<tr><td>${d.day}</td><td>${x.slot}</td><td>${esc(x.name)}</td>
+     <td>${x.status === "taken" ? `<span class="pill taken">${t("taken")}</span>`
+        : x.status === "skipped" ? `<span class="pill skipped">${t("skipped")}</span>`
+        : `<span class="pill">${t("pending")}</span>`}</td></tr>`)));
+  $("histTable").innerHTML = rows.length
+    ? `<table><tr><th>${t("day")}</th><th>${t("timeCol")}</th><th>${t("medCol")}</th><th>${t("statusCol")}</th></tr>${rows.join("")}</table>`
+    : `<p class="sub">${t("noMeds")}</p>`;
+}
+
+// ---------- settings ----------
+async function renderSettings() {
+  const h = health || {};
+  const notifBtn = (window.Notification && Notification.permission === "granted")
+    ? `<span class="pill taken">${t("notifOn")}</span>`
+    : `<button class="btn" onclick="askNotif()">${t("notifOff")}</button>`;
+  $("settingsBody").innerHTML = `
+    <div class="cards">
+      <div class="c"><span class="label">GROQ KEY</span><b style="color:${h.groq_ready?"var(--good)":"var(--warn)"}">${h.groq_ready?"OK":"—"}</b></div>
+      <div class="c"><span class="label">TEXT MODEL</span><b style="font-size:15px">${esc(h.text_model||"")}</b></div>
+      <div class="c"><span class="label">VISION MODEL</span><b style="font-size:15px">${esc(h.vision_model||"")}</b></div>
+    </div>
+    ${h.groq_ready ? "" : `<div class="banner err">${esc(h.message||"")}</div>`}
+    <p class="sub">.env: <code>${esc(h.env_path||"")}</code> — ${h.env_exists ? "found" : "not found"}</p>
+    <p style="margin-top:16px">${notifBtn}</p>
+    <p style="margin-top:20px"><button class="ghost" onclick="listModels()">List models my key can use</button></p>
+    <div id="modelList" class="sub" style="margin-top:12px"></div>`;
+}
+function askNotif() {
+  if (window.Notification) Notification.requestPermission().then(renderSettings);
+}
+async function listModels() {
+  $("modelList").textContent = "…";
+  const j = await (await fetch("/api/models")).json();
+  $("modelList").innerHTML = j.ok
+    ? "<b>Available:</b><br>" + j.models.map(esc).join("<br>")
+    : `<span style="color:var(--warn)">${esc(j.message)}</span>`;
+}
+
+// ---------- helpers ----------
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const attr = s => esc(s).replace(/"/g, "&quot;");
+const val = id => ($(id) ? $(id).value.trim() : "");
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+function tick() {
+  const d = new Date();
+  $("clock").textContent = String(d.getHours()).padStart(2,"0") + ":" +
+                           String(d.getMinutes()).padStart(2,"0");
+}
+setInterval(tick, 1000); tick();
+setInterval(() => { if (currentTab() === "today") loadDue(); }, 15000);
+
+(async () => {
+  setLang(lang);
+  try { health = await (await fetch("/api/health")).json(); } catch (e) {}
+  renderKeyWarn();
+  loadToday();
+})();
+</script>
+</body>
+</html>

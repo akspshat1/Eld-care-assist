@@ -1,0 +1,6 @@
+data/*.db
+__pycache__/
+*.pyc
+
+# The two ONNX models (~34 MB total) ARE committed, so this app is
+# clone-and-run. Re-fetch them any time with: python download_models.py
