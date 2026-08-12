@@ -6,5 +6,5 @@ schedule
 fastapi
 uvicorn[standard]
 python-multipart
-pipecat-ai[webrtc,groq,silero]
+pipecat-ai[webrtc,groq,silero]==1.7.0
 chromadb

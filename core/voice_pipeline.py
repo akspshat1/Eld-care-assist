@@ -14,9 +14,13 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.services.groq.llm import GroqLLMService
 from pipecat.services.groq.stt import GroqSTTService
+from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 
@@ -38,18 +42,21 @@ async def run_voice_bot(webrtc_connection, conversation_id, resident):
         params=TransportParams(
             audio_in_enabled=True,
             audio_out_enabled=False,
-            vad_analyzer=SileroVADAnalyzer(),
         ),
     )
     stt = GroqSTTService(
-        api_key=GROQ_API_KEY, settings=GroqSTTService.Settings(model=GROQ_WHISPER_MODEL)
+        api_key=GROQ_API_KEY,
+        settings=GroqSTTService.Settings(model=GROQ_WHISPER_MODEL, language=Language.JA),
     )
     llm = GroqLLMService(
         api_key=GROQ_API_KEY, settings=GroqLLMService.Settings(model=GROQ_MODEL)
     )
 
     context = LLMContext([{"role": "system", "content": build_system_prompt(resident)}])
-    context_aggregator = LLMContextAggregatorPair(context)
+    context_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+    )
 
     pipeline = Pipeline(
         [
@@ -64,7 +71,9 @@ async def run_voice_bot(webrtc_connection, conversation_id, resident):
     task = PipelineTask(pipeline)
 
     @context_aggregator.user().event_handler("on_user_turn_stopped")
-    async def on_user_turn_stopped(_aggregator, message):
+    async def on_user_turn_stopped(_aggregator, _strategy, message):
+        if not message.content:
+            return
         add_message(conversation_id, "user", message.content)
         webrtc_connection.send_app_message({"role": "user", "text": message.content})
 
