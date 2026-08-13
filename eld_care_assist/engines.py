@@ -101,6 +101,19 @@ def get_med_extractor():
     return extractor
 
 
+def handsfree_available():
+    """Is the Pipecat voice pipeline installed?
+
+    Checked with find_spec rather than importing: pipecat pulls in torch and
+    takes seconds, which is far too slow for a status call.
+    """
+    import importlib.util
+    try:
+        return importlib.util.find_spec("pipecat") is not None
+    except (ImportError, ValueError):
+        return False
+
+
 def status():
     """What is installed, for the UI to show up front."""
     return {
@@ -108,4 +121,5 @@ def status():
         "voice": voice_available(),
         "medications": os.path.isdir(config.MED_DIR),
         "groq": config.groq_ready(),
+        "handsfree": handsfree_available(),
     }

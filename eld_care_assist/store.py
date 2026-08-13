@@ -63,6 +63,31 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);
 
+-- People the resident can ask to call, and who can be notified. Kept in this
+-- shared database so the conversation feature and the family dashboard both
+-- see the same list.
+CREATE TABLE IF NOT EXISTS contacts (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    resident_id  INTEGER,
+    name         TEXT NOT NULL,
+    relationship TEXT,
+    phone        TEXT NOT NULL,
+    email        TEXT,
+    is_primary   INTEGER NOT NULL DEFAULT 0,
+    notes        TEXT,
+    created_ts   REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_contact_res ON contacts(resident_id);
+
+CREATE TABLE IF NOT EXISTS call_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    contact_id  INTEGER NOT NULL,
+    resident_id INTEGER,
+    ts          REAL NOT NULL,
+    day         TEXT NOT NULL,
+    source      TEXT NOT NULL DEFAULT 'conversation'
+);
+
 CREATE TABLE IF NOT EXISTS conv_records (
     conversation_id INTEGER PRIMARY KEY,
     day             TEXT NOT NULL,
@@ -118,6 +143,31 @@ class Store:
             if column not in cols:
                 self._conn.execute(
                     f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+
+    def save_audio_pcm(self, conversation_id, message_id, pcm, sample_rate,
+                       channels=1, sample_width=2):
+        """Save raw 16-bit PCM as a WAV and attach it to a message.
+
+        The hands-free pipeline hands over bare PCM, not a container, so the
+        header is written here -- the voice-emotion model needs a real file.
+        """
+        import wave
+        import io as _io
+
+        buf = _io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(channels)
+            w.setsampwidth(sample_width)
+            w.setframerate(sample_rate or 16000)
+            w.writeframes(pcm)
+        return self.save_audio(conversation_id, message_id, buf.getvalue())
+
+    def last_message_id(self, conversation_id, role="user"):
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT id FROM messages WHERE conversation_id=? AND role=?"
+                " ORDER BY id DESC LIMIT 1", (conversation_id, role)).fetchone()
+        return row["id"] if row else None
 
     def save_audio(self, conversation_id, message_id, audio_bytes, ext="wav"):
         """Write a spoken turn to disk and attach it to its message."""
@@ -319,6 +369,84 @@ class Store:
                 " JOIN conversations c ON c.id = r.conversation_id"
                 " WHERE r.day=? ORDER BY r.ts", (day,)).fetchall()
         return [_dict(r) for r in rows]
+
+    # ------------------------------------------------------------ contacts --
+    def contacts(self, resident_id=None):
+        """Contacts for this resident, plus any shared ones (resident_id NULL)."""
+        if resident_id is None:
+            q, args = "SELECT * FROM contacts", []
+        else:
+            q = "SELECT * FROM contacts WHERE resident_id=? OR resident_id IS NULL"
+            args = [resident_id]
+        q += " ORDER BY is_primary DESC, name"
+        with self._lock:
+            return [_dict(r) for r in self._conn.execute(q, args).fetchall()]
+
+    def contact(self, cid):
+        with self._lock:
+            return _dict(self._conn.execute(
+                "SELECT * FROM contacts WHERE id=?", (cid,)).fetchone())
+
+    def add_contact(self, name, phone, relationship="", resident_id=None,
+                    email="", is_primary=False, notes=""):
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO contacts (resident_id, name, relationship, phone,"
+                " email, is_primary, notes, created_ts) VALUES (?,?,?,?,?,?,?,?)",
+                (resident_id, name, relationship, phone, email,
+                 1 if is_primary else 0, notes, datetime.now().timestamp()))
+            self._conn.commit()
+            return cur.lastrowid
+
+    def update_contact(self, cid, fields):
+        allowed = ("name", "relationship", "phone", "email", "is_primary",
+                   "notes", "resident_id")
+        sets, vals = [], []
+        for k, v in fields.items():
+            if k not in allowed:
+                continue
+            if k == "is_primary":
+                v = 1 if v else 0
+            sets.append(f"{k}=?")
+            vals.append(v)
+        if not sets:
+            return False
+        vals.append(cid)
+        with self._lock:
+            self._conn.execute(
+                f"UPDATE contacts SET {', '.join(sets)} WHERE id=?", vals)
+            self._conn.commit()
+        return True
+
+    def delete_contact(self, cid):
+        with self._lock:
+            self._conn.execute("DELETE FROM contacts WHERE id=?", (cid,))
+            self._conn.commit()
+
+    def log_call(self, contact_id, resident_id=None, source="conversation"):
+        ts = datetime.now().timestamp()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO call_log (contact_id, resident_id, ts, day, source)"
+                " VALUES (?,?,?,?,?)",
+                (contact_id, resident_id, ts,
+                 datetime.fromtimestamp(ts).strftime("%Y-%m-%d"), source))
+            self._conn.commit()
+
+    def recent_calls(self, resident_id=None, limit=20):
+        q = ("SELECT l.*, c.name, c.relationship, c.phone FROM call_log l"
+             " JOIN contacts c ON c.id = l.contact_id")
+        args = []
+        if resident_id:
+            q += " WHERE l.resident_id=?"
+            args.append(resident_id)
+        q += " ORDER BY l.ts DESC LIMIT ?"
+        args.append(limit)
+        with self._lock:
+            rows = [_dict(r) for r in self._conn.execute(q, args).fetchall()]
+        for r in rows:
+            r["time"] = datetime.fromtimestamp(r["ts"]).strftime("%H:%M")
+        return rows
 
     def close(self):
         with self._lock:

@@ -64,6 +64,35 @@ const T = {
   btnHandsFree:"🎙 Hands-free conversation", btnHandsFreeStop:"■ End conversation",
   hfIdle:"Talk normally — no buttons. It listens, replies, and listens again.",
   hfConnecting:"Connecting…", hfActive:"Listening — just speak.",
+  tabMood:"Mood", moodTitle:"Mood check",
+  moodSub:"Read mood from a photo, from the voice, or both. Nothing is saved unless you press Save.",
+  moodFace:"From a photo", moodVoice:"From the voice",
+  moodVoiceHelp:"Speak for a few seconds \u2014 anything at all.",
+  btnUploadPhoto:"Upload a photo", btnSaveMood:"Save this reading", btnClear:"Clear",
+  moodHistory:"Mood history", moodSaved:"Saved to today's record.",
+  moodNothing:"Take a photo or record your voice first.",
+  moodCombined:(s)=>`Overall mood reading: ${s}/100`,
+  moodNoHistory:"No mood readings yet.",
+  callOffer:(n)=>`Call ${n}?`, btnCallNow:"📞 Call now", btnNotNow:"Not now",
+  tabFamily:"Family", familyTitle:"Family view",
+  familySub:"What a relative sees: how they are, what needs attention, and who to call.",
+  famAttention:"Needs attention", famContacts:"Contacts", famAddContact:"Add a contact",
+  famHistory:"Last 14 days", famNothing:"Nothing needs attention right now.",
+  fcName:"Name", fcRel:"Relationship", fcPhone:"Phone", fcMain:"Main contact",
+  fcAdd:"Add contact", fcNeed:"Name and phone are required.", fcAdded:"Added.",
+  fcCall:"\ud83d\udcde Call", fcSetMain:"Set as main", fcUnsetMain:"Unset main",
+  fcDelete:"Delete", fcNone:"No contacts yet.", fcConfirm:n=>`Remove ${n}?`,
+  famDoingWell:"Doing well", famAllRight:"Doing all right", famBitLow:"A bit low",
+  famNotWell:"Not doing well", famNoReading:"No reading yet",
+  famLastCheck:(d,t)=>`Last check-in ${d} at ${t}`, famNever:"No check-ins yet",
+  modeResident:"Resident", modeCare:"Care team",
+  tabHomeR:"Home", residentSub:"What would you like to do?",
+  raTalk:"Have a chat", raTalkD:"Talk about anything. Just speak \u2014 no buttons.",
+  raCheck:"Today's check-in", raCheckD:"A few gentle questions about how you feel.",
+  trendTitle:"Wellbeing trend", famContactsHelp:"Saying \u201ccall my daughter\u201d in a conversation offers to ring them.",
+  nextMed:(n,t)=>`Next medicine: ${n} at ${t}`, noNextMed:"No more medicines today.",
+  greetMorning:n=>`Good morning, ${n}.`, greetAfternoon:n=>`Good afternoon, ${n}.`,
+  greetEvening:n=>`Good evening, ${n}.`,
   micDenied:"Microphone unavailable. Check the browser's permission.",
   camDenied:"Camera unavailable. Check the browser's permission."
  },
@@ -124,6 +153,36 @@ const T = {
   btnHandsFree:"🎙 ハンズフリー会話", btnHandsFreeStop:"■ 会話を終える",
   hfIdle:"ボタンなしで、普通にお話しください。聞いて、返事して、また聞きます。",
   hfConnecting:"接続中…", hfActive:"お聞きしています。どうぞお話しください。",
+  tabMood:"気分", moodTitle:"気分チェック",
+  moodSub:"写真・声、またはその両方から気分を読み取ります。保存を押すまで記録されません。",
+  moodFace:"写真から", moodVoice:"声から",
+  moodVoiceHelp:"数秒間、何でもお話しください。",
+  btnUploadPhoto:"写真をアップロード", btnSaveMood:"この結果を保存", btnClear:"クリア",
+  moodHistory:"気分の記録", moodSaved:"今日の記録に保存しました。",
+  moodNothing:"先に写真を撮るか、声を録音してください。",
+  moodCombined:(s)=>`総合的な気分：${s}/100`,
+  moodNoHistory:"まだ記録がありません。",
+  callOffer:(n)=>`${n}さんに電話しますか？`, btnCallNow:"📞 今すぐ電話", btnNotNow:"やめておく",
+  tabFamily:"家族", familyTitle:"家族向けの表示",
+  familySub:"ご家族が見る画面です。ご様子、気になる点、連絡先。",
+  famAttention:"気になる点", famContacts:"連絡先", famAddContact:"連絡先を追加",
+  famHistory:"直近14日", famNothing:"今のところ心配な点はありません。",
+  fcName:"お名前", fcRel:"ご関係", fcPhone:"電話番号", fcMain:"主な連絡先",
+  fcAdd:"追加", fcNeed:"お名前と電話番号が必要です。", fcAdded:"追加しました。",
+  fcCall:"\ud83d\udcde 電話", fcSetMain:"主にする", fcUnsetMain:"主を解除",
+  fcDelete:"削除", fcNone:"まだ連絡先がありません。", fcConfirm:n=>`${n} を削除しますか？`,
+  famDoingWell:"お元気です", famAllRight:"まずまずです", famBitLow:"少し元気がありません",
+  famNotWell:"調子が良くありません", famNoReading:"記録がありません",
+  famLastCheck:(d,t)=>`最終チェック ${d} ${t}`, famNever:"まだ記録がありません",
+  modeResident:"ご本人", modeCare:"ケアチーム",
+  tabHomeR:"ホーム", residentSub:"何をいたしましょうか？",
+  raTalk:"お話しする", raTalkD:"何でもお話しください。ボタンは不要です。",
+  raCheck:"今日の体調チェック", raCheckD:"かんたんな質問にお答えください。",
+  trendTitle:"調子の推移", famContactsHelp:"会話中に「娘に電話」と言うとご案内します。",
+  nextMed:(n,t)=>`次のお薬：${n}（${t}）`, noNextMed:"今日のお薬は終わりました。",
+  greetMorning:n=>`${n}さん、おはようございます。`,
+  greetAfternoon:n=>`${n}さん、こんにちは。`,
+  greetEvening:n=>`${n}さん、こんばんは。`,
   micDenied:"マイクを使用できません。ブラウザの許可をご確認ください。",
   camDenied:"カメラを使用できません。ブラウザの許可をご確認ください。"
  }
@@ -161,18 +220,54 @@ function setLang(l) {
 document.querySelectorAll("nav button").forEach(b => {
   b.onclick = () => go(b.dataset.tab);
 });
+
+/* Two audiences, one app: the resident gets a calm two-choice home, the care
+   team gets the data. Tabs are filtered by mode rather than shown all at once. */
+let mode = localStorage.getItem("eca_mode") || "resident";
+
+function setMode(m) {
+  mode = m;
+  localStorage.setItem("eca_mode", m);
+  document.body.dataset.mode = m;
+  $("modeResident").classList.toggle("on", m === "resident");
+  $("modeCare").classList.toggle("on", m === "care");
+  applyTabVisibility();
+
+  // Always land on this mode's home. Switching mode is a deliberate change of
+  // context, so carrying the previous tab over is more confusing than helpful.
+  go(m === "resident" ? "residentHome" : "home");
+}
+
+function applyTabVisibility() {
+  document.querySelectorAll("nav button").forEach(b => {
+    const forMode = b.dataset.for;
+    b.classList.toggle("hide", !(forMode === "both" || forMode === mode));
+  });
+}
+
 function go(tab) {
   document.querySelectorAll("nav button").forEach(x =>
     x.classList.toggle("on", x.dataset.tab === tab));
   document.querySelectorAll(".panel").forEach(x =>
     x.classList.toggle("on", x.id === tab));
+  window.scrollTo({ top: 0, behavior: "smooth" });
   refreshTab();
 }
-const currentTab = () => document.querySelector("nav button.on").dataset.tab;
+const currentTab = () => document.querySelector("nav button.on")?.dataset.tab || "";
+
 function refreshTab() {
   const tab = currentTab();
-  if (tab === "home") loadHome();
-  if (tab === "meds") loadMeds();
+  // Each loader talks to the network; one failing must not stop a tab or mode
+  // switch from completing.
+  try {
+    if (tab === "home") loadHome();
+    if (tab === "meds") loadMeds();
+    if (tab === "mood") loadMoodHistory();
+    if (tab === "family") loadFamily();
+    if (tab === "residentHome") loadResidentHome();
+  } catch (e) {
+    console.error("refreshTab:", e);
+  }
 }
 
 /* ---------------- boot ---------------- */
@@ -182,7 +277,7 @@ function refreshTab() {
     state.health = await (await fetch("/api/health")).json();
     if (!state.health.features.groq) {
       $("homeAlerts").innerHTML =
-        `<div class="banner err">${esc(state.health.groq_message || "Groq key missing")}</div>`;
+        `<div class="note bad">${esc(state.health.groq_message || "Groq key missing")}</div>`;
     }
   } catch (e) { /* server not reachable; pages still render */ }
 
@@ -194,8 +289,34 @@ function refreshTab() {
   sel.onchange = () => { state.residentId = Number(sel.value); state.conversationId = null;
                          $("chat").innerHTML = ""; refreshTab(); };
   await loadQuestions();
-  loadHome();
+  // Applies the saved mode, filters the tabs and opens that mode's home.
+  setMode(mode);
 })();
+
+
+/* ---------- resident home ---------- */
+async function loadResidentHome() {
+  const name = state.residents.find(p => p.id === state.residentId)?.name || "";
+  const h = new Date().getHours();
+  const greet = h < 12 ? t("greetMorning") : h < 18 ? t("greetAfternoon") : t("greetEvening");
+  $("residentGreet").textContent = greet(name.split(" ")[0] || name);
+
+  // One useful, non-nagging line: what is coming next.
+  try {
+    const m = await (await fetch("/api/medications/today")).json();
+    const due = (m.due || [])[0];
+    const next = m.next;
+    if (due) {
+      $("residentNext").innerHTML =
+        `<div class="note warn"><span class="ic">\u23f0</span><div>${esc(t("nextMed")(due.name, due.slot))}</div></div>`;
+    } else if (next) {
+      $("residentNext").innerHTML =
+        `<div class="note info"><span class="ic">\ud83d\udc8a</span><div>${esc(t("nextMed")(next.name, next.slot))}</div></div>`;
+    } else {
+      $("residentNext").innerHTML = "";
+    }
+  } catch (e) { $("residentNext").innerHTML = ""; }
+}
 
 /* ================= HOME ================= */
 async function loadHome() {
@@ -211,7 +332,7 @@ async function loadHome() {
   $("hTalks").textContent = h.checkins.length;
 
   $("homeRecent").innerHTML = h.checkins.length ? h.checkins.map(c => `
-      <div class="c" style="margin-bottom:10px">
+      <div class="stat" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;gap:10px">
           <b style="color:${scoreColor(c.wellbeing)}">${c.wellbeing ?? "—"}/100</b>
           <span class="sub">${c.day} ${c.time}</span>
@@ -313,7 +434,7 @@ async function snap() {
     if (!j.ok) { $("ciFaceOut").innerHTML = `<span style="color:var(--warn)">${esc(j.message)}</span>`; return; }
     if (!j.found) { state.face = null; $("ciFaceOut").textContent = t("noFace"); return; }
     state.face = j.face;
-    $("ciFaceOut").innerHTML = `<div class="banner info">${t("faceSeen")(j.face.emotion, Math.round(j.face.confidence))}</div>`;
+    $("ciFaceOut").innerHTML = `<div class="note info">${t("faceSeen")(j.face.emotion, Math.round(j.face.confidence))}</div>`;
   } catch (e) { $("ciFaceOut").textContent = String(e); }
 }
 
@@ -376,7 +497,7 @@ async function toggleCiRec() {
       state.transcript = j.transcript || "";
       state.voice = j.voice || null;
       $("ciVoiceOut").innerHTML =
-        `<div class="banner info">${esc(t("heard")(state.transcript))}` +
+        `<div class="note info">${esc(t("heard")(state.transcript))}` +
         (j.voice ? `<br>${esc(t("toneWas")(j.voice.emotion, Math.round(j.voice.confidence)))}` : "") +
         `</div>`;
     } catch (e) { $("ciVoiceOut").textContent = String(e); }
@@ -391,9 +512,9 @@ async function toggleCiRec() {
 
 async function submitCheckin() {
   $("ciError").innerHTML = "";
-  if (!state.residentId) { $("ciError").innerHTML = `<div class="banner err">${t("needPerson")}</div>`; return; }
+  if (!state.residentId) { $("ciError").innerHTML = `<div class="note bad">${t("needPerson")}</div>`; return; }
   if (!Object.keys(state.answers).length) {
-    $("ciError").innerHTML = `<div class="banner err">${t("needAnswer")}</div>`; return; }
+    $("ciError").innerHTML = `<div class="note bad">${t("needAnswer")}</div>`; return; }
 
   const btn = $("ciSubmit");
   btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>${t("thinking")}`;
@@ -404,7 +525,7 @@ async function submitCheckin() {
                              face: state.face, voice: state.voice,
                              transcript: state.transcript, lang })
     })).json();
-    if (!j.ok) { $("ciError").innerHTML = `<div class="banner err">${esc(j.message)}</div>`; return; }
+    if (!j.ok) { $("ciError").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
     showCheckinResult(j);
     state.answers = {}; state.face = null; state.voice = null; state.transcript = "";
     renderQuestions();
@@ -417,11 +538,11 @@ async function submitCheckin() {
 
 function showCheckinResult(j) {
   const urgent = j.urgent ? `
-    <div class="banner err" style="font-size:17px">
+    <div class="note bad" style="font-size:17px">
       <b>⚠ ${t("urgentTitle")}</b><br>${t("urgentBody")}
     </div>` : "";
   $("ciResult").innerHTML = urgent + `
-    <div class="c">
+    <div class="stat">
       <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div><div class="score" style="color:${scoreColor(j.wellbeing)}">${j.wellbeing ?? "—"}</div>
              <div class="sub">/100</div></div>
@@ -593,10 +714,11 @@ async function sendText() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content, lang })
     })).json();
-    if (!j.ok) { $("talkError").innerHTML = `<div class="banner err">${esc(j.message)}</div>`; return; }
+    if (!j.ok) { $("talkError").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
     $("talkError").innerHTML = "";
     addBubble("assistant", j.reply);
     speak(j.reply);
+    showCallOffer(j.call);
   } finally { $("sendBtn").disabled = false; }
 }
 
@@ -611,17 +733,17 @@ async function toggleChatRec() {
     try {
       const j = await (await fetch(`/api/conversation/${cid}/say_audio?lang=${lang}`,
         { method: "POST", body: blob })).json();
-      if (!j.ok) { $("talkError").innerHTML = `<div class="banner err">${esc(j.message)}</div>`; return; }
+      if (!j.ok) { $("talkError").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
       $("talkError").innerHTML = "";
       addBubble("user", j.transcript);
       addBubble("assistant", j.reply);
       speak(j.reply);
-    } catch (e) { $("talkError").innerHTML = `<div class="banner err">${esc(String(e))}</div>`; }
+    } catch (e) { $("talkError").innerHTML = `<div class="note bad">${esc(String(e))}</div>`; }
   } else {
     try {
       chatRec = makeRecorder(); await chatRec.start();
       btn.textContent = "■"; btn.className = "btn red";
-    } catch (e) { chatRec = null; $("talkError").innerHTML = `<div class="banner err">${t("micDenied")}</div>`; }
+    } catch (e) { chatRec = null; $("talkError").innerHTML = `<div class="note bad">${t("micDenied")}</div>`; }
   }
 }
 
@@ -661,7 +783,7 @@ async function toggleHandsFree() {
   } catch (e) {
     hfCall = null;
     $("hfStatus").textContent = t("hfIdle");
-    $("talkError").innerHTML = `<div class="banner err">${esc(String(e.message || e))}</div>`;
+    $("talkError").innerHTML = `<div class="note bad">${esc(String(e.message || e))}</div>`;
   } finally { btn.disabled = false; }
 }
 
@@ -673,7 +795,7 @@ async function analyzeVoice() {
   if (!j.ok) { $("voiceSummary").innerHTML = `<span style="color:var(--warn)">${esc(j.message)}</span>`; return; }
   const s = j.summary;
   $("voiceSummary").innerHTML = s
-    ? `<div class="banner info">${esc(t("analysed")(s.analyzed, s.dominant))}</div>`
+    ? `<div class="note info">${esc(t("analysed")(s.analyzed, s.dominant))}</div>`
     : esc(j.message || t("noRecordings"));
 }
 
@@ -682,10 +804,282 @@ async function saveRecord() {
   $("talkRecord").innerHTML = `<span class="spinner"></span>${t("working")}`;
   const j = await (await fetch(`/api/conversation/${state.conversationId}/record?lang=${lang}`,
     { method: "POST" })).json();
-  if (!j.ok) { $("talkRecord").innerHTML = `<div class="banner err">${esc(j.message)}</div>`; return; }
-  $("talkRecord").innerHTML = `<div class="banner good">${t("recordSaved")}</div>
-    <div class="c"><b>${esc(j.mood)}</b><div class="sub" style="margin-top:6px">${esc(j.summary)}</div>
+  if (!j.ok) { $("talkRecord").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
+  $("talkRecord").innerHTML = `<div class="note good">${t("recordSaved")}</div>
+    <div class="stat"><b>${esc(j.mood)}</b><div class="sub" style="margin-top:6px">${esc(j.summary)}</div>
     <div class="sub" style="margin-top:6px">${esc(j.notable_points)}</div></div>`;
+}
+
+
+
+/* ---------- call offer ----------
+   The resident asked to phone someone. A person always confirms: the app
+   never dials by itself. The tel: link opens the device dialler. */
+function showCallOffer(call) {
+  const box = $("callOffer");
+  if (!call) { box.innerHTML = ""; return; }
+  box.innerHTML = `
+    <div class="note good" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <b style="font-size:18px">${esc(t("callOffer")(call.name))}</b>
+        <div class="sub">${esc(call.relationship || "")}${call.relationship ? " · " : ""}${esc(call.phone)}</div>
+      </div>
+      <a class="btn good" style="text-decoration:none" href="${esc(call.tel)}"
+         onclick="logCall(${call.contact_id})">${t("btnCallNow")}</a>
+      <button class="btn ghost" onclick="document.getElementById('callOffer').innerHTML=''">
+        ${t("btnNotNow")}</button>
+    </div>`;
+  if (call.say) speak(call.say);
+}
+
+function logCall(contactId) {
+  fetch(`/api/calls/${contactId}/log?resident_id=${state.residentId}`,
+        { method: "POST" }).catch(() => {});
+}
+
+/* ================= MOOD ================= */
+let moodFace = null, moodVoice = null, moodCam = null, moodRec = null;
+
+async function moodOpenCam() {
+  try { moodCam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }); }
+  catch (e) { $("mFaceOut").innerHTML = `<div class="note bad">${t("camDenied")}</div>`; return; }
+  const v = $("mVideo");
+  v.srcObject = moodCam; v.classList.remove("hide");
+  $("mCanvas").classList.add("hide");
+  $("mSnapBtn").classList.remove("hide");
+  $("mRetake").classList.add("hide");
+  $("mCamBtn").classList.add("hide");
+}
+
+async function moodSnap() {
+  const v = $("mVideo"), c = $("mCanvas");
+  c.width = v.videoWidth || 640; c.height = v.videoHeight || 480;
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  if (moodCam) { moodCam.getTracks().forEach(x => x.stop()); moodCam = null; }
+  $("mVideo").classList.add("hide"); c.classList.remove("hide");
+  $("mSnapBtn").classList.add("hide"); $("mRetake").classList.remove("hide");
+  const blob = await new Promise(res => c.toBlob(res, "image/jpeg", 0.9));
+  await analyseMoodPhoto(blob);
+}
+
+$("mFile").onchange = e => { if (e.target.files[0]) analyseMoodPhoto(e.target.files[0]); };
+
+async function analyseMoodPhoto(blob) {
+  $("mFaceOut").innerHTML = `<span class="spinner"></span>${t("working")}`;
+  try {
+    const j = await (await fetch("/api/checkin/photo", { method: "POST", body: blob })).json();
+    if (!j.ok) { $("mFaceOut").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
+    if (!j.found) { moodFace = null; $("mFaceOut").innerHTML = `<div class="note warn">${t("noFace")}</div>`; return; }
+    moodFace = j.face;
+    $("mFaceOut").innerHTML = `<div class="note info">${esc(t("faceSeen")(j.face.emotion, Math.round(j.face.confidence)))}</div>`;
+    showCombined();
+  } catch (e) { $("mFaceOut").innerHTML = `<div class="note bad">${esc(String(e))}</div>`; }
+}
+
+async function toggleMoodRec() {
+  const btn = $("mRecBtn");
+  if (moodRec) {
+    const blob = await moodRec.stop(); moodRec = null;
+    btn.textContent = t("btnRecord"); btn.className = "btn grey";
+    $("mLevel").style.width = "0";
+    if (!blob) return;
+    $("mVoiceOut").innerHTML = `<span class="spinner"></span>${t("working")}`;
+    try {
+      const j = await (await fetch(`/api/checkin/voice?lang=${lang}`, { method: "POST", body: blob })).json();
+      if (!j.ok) { $("mVoiceOut").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
+      moodVoice = j.voice || null;
+      const heard = j.transcript ? `<div class="sub" style="margin-top:6px">${esc(t("heard")(j.transcript))}</div>` : "";
+      $("mVoiceOut").innerHTML = j.voice
+        ? `<div class="note info">${esc(t("toneWas")(j.voice.emotion, Math.round(j.voice.confidence)))}${heard}</div>`
+        : `<div class="note warn">${esc(j.transcript || "")}</div>`;
+      showCombined();
+    } catch (e) { $("mVoiceOut").innerHTML = `<div class="note bad">${esc(String(e))}</div>`; }
+  } else {
+    try {
+      moodRec = makeRecorder(); await moodRec.start();
+      btn.textContent = t("btnStop"); btn.className = "btn red";
+    } catch (e) { moodRec = null; $("mVoiceOut").innerHTML = `<div class="note bad">${t("micDenied")}</div>`; }
+  }
+}
+
+/* Face and voice valence are both -1..1; average whichever we have. */
+function moodScore() {
+  const vals = [];
+  if (moodFace && moodFace.valence != null) vals.push(moodFace.valence);
+  if (moodVoice && moodVoice.valence != null) vals.push(moodVoice.valence);
+  if (!vals.length) return null;
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return Math.round(50 + 50 * mean);
+}
+
+function showCombined() {
+  const s = moodScore();
+  $("mCombined").innerHTML = s == null ? "" : `
+    <div class="stat" style="margin-top:6px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+      <div class="score" style="color:${scoreColor(s)}">${s}</div>
+      <div><b>${esc(t("moodCombined")(s))}</b>
+        <div class="sub">${moodFace ? `${esc(moodFace.emotion)} (photo)` : ""}
+          ${moodFace && moodVoice ? " \u00b7 " : ""}
+          ${moodVoice ? `${esc(moodVoice.emotion)} (voice)` : ""}</div></div>
+    </div>`;
+}
+
+async function saveMood() {
+  if (!moodFace && !moodVoice) { $("mSaved").innerHTML = `<div class="note warn">${t("moodNothing")}</div>`; return; }
+  const btn = $("mSaveBtn"); btn.disabled = true;
+  try {
+    const j = await (await fetch("/api/checkin/submit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resident_id: state.residentId, answers: { mood_only: "yes" },
+                             face: moodFace, voice: moodVoice, lang })
+    })).json();
+    $("mSaved").innerHTML = j.ok
+      ? `<div class="note good">${t("moodSaved")}</div>`
+      : `<div class="note bad">${esc(j.message)}</div>`;
+    if (j.ok) { loadMoodHistory(); loadHome(); }
+  } finally { btn.disabled = false; }
+}
+
+function clearMood() {
+  moodFace = null; moodVoice = null;
+  $("mFaceOut").innerHTML = ""; $("mVoiceOut").innerHTML = "";
+  $("mCombined").innerHTML = ""; $("mSaved").innerHTML = "";
+  $("mCanvas").classList.add("hide");
+  $("mCamBtn").classList.remove("hide"); $("mRetake").classList.add("hide");
+}
+
+async function loadMoodHistory() {
+  if (!state.residentId) return;
+  const j = await (await fetch(`/api/checkin/history?resident_id=${state.residentId}&limit=20`)).json();
+  const rows = j.checkins.filter(c => c.face_emotion || c.voice_emotion);
+  $("mHistory").innerHTML = rows.length ? `<table style="width:100%;border-collapse:collapse">
+    ${rows.map(c => `<tr style="border-bottom:1px solid var(--line)">
+      <td style="padding:9px 6px">${esc(c.day)} ${esc(c.time)}</td>
+      <td style="padding:9px 6px"><b style="color:${scoreColor(c.wellbeing)}">${c.wellbeing ?? "\u2014"}</b></td>
+      <td style="padding:9px 6px">${c.face_emotion ? `\ud83d\ude42 ${esc(c.face_emotion)}` : ""}</td>
+      <td style="padding:9px 6px">${c.voice_emotion ? `\ud83c\udfa4 ${esc(c.voice_emotion)}` : ""}</td>
+    </tr>`).join("")}</table>` : `<p class="sub">${t("moodNoHistory")}</p>`;
+}
+
+
+/* ================= FAMILY ================= */
+const famWord = s => s == null ? t("famNoReading")
+  : s >= 75 ? t("famDoingWell") : s >= 60 ? t("famAllRight")
+  : s >= 40 ? t("famBitLow") : t("famNotWell");
+
+async function loadFamily() {
+  if (!state.residentId) return;
+  let j;
+  try {
+    j = await (await fetch(`/api/family/overview?resident_id=${state.residentId}`)).json();
+  } catch (e) { return; }
+  if (!j.ok) { $("famHero").innerHTML = `<div class="sub">${esc(j.message)}</div>`; return; }
+
+  const score = j.latest ? j.latest.wellbeing : null;
+  $("famHero").innerHTML = `
+    <div style="width:96px;height:96px;border-radius:50%;display:grid;place-items:center;
+                font-size:28px;font-weight:800;color:#fff;background:${scoreColor(score)}">
+      ${score ?? "\u2014"}</div>
+    <div style="flex:1;min-width:220px">
+      <div style="font-size:20px;font-weight:700">${esc(j.resident.name)}</div>
+      <div style="font-size:18px;font-weight:600;color:${scoreColor(score)}">${famWord(score)}</div>
+      <div class="sub" style="margin-top:4px">
+        ${j.latest ? esc(t("famLastCheck")(j.latest.day, j.latest.time)) : t("famNever")}</div>
+      ${j.latest && j.latest.summary ? `<div style="margin-top:8px">${esc(j.latest.summary)}</div>` : ""}
+    </div>
+    ${j.trend.length > 1 ? `<div style="min-width:170px">
+      <div class="sub">${esc(t("famHistory"))}</div>
+      <div style="display:flex;align-items:flex-end;gap:3px;height:64px;margin-top:6px">
+        ${j.trend.map(d => `<div title="${d.day}: ${d.score}" style="flex:1;border-radius:3px 3px 0 0;
+          min-height:3px;height:${Math.max(4, d.score)}%;background:${scoreColor(d.score)}"></div>`).join("")}
+      </div></div>` : ""}`;
+
+  $("famAlerts").innerHTML = j.alerts.length
+    ? j.alerts.map(a => `<div class="banner ${a.level === "urgent" ? "err" : a.level === "warn" ? "warn" : "info"}">
+        ${a.level === "urgent" ? "\ud83d\udea8" : a.level === "warn" ? "\u26a0" : "\u2139"} ${esc(a.text)}
+        <div class="sub" style="font-weight:400">${esc(a.when || "")}</div></div>`).join("")
+    : `<div class="note good">${t("famNothing")}</div>`;
+
+  const med = j.medication;
+  $("famCards").innerHTML = `
+    <div class="stat"><span class="label">${t("cMeds")}</span>
+      <b>${med ? `${med.today.taken}/${med.today.total}` : "\u2014"}</b></div>
+    <div class="stat"><span class="label">${t("mMissed")}</span>
+      <b style="color:${med && med.today.missed ? "var(--warn)" : "inherit"}">
+        ${med ? med.today.missed : "\u2014"}</b></div>
+    <div class="stat"><span class="label">${t("mNext")}</span>
+      <b>${med && med.next ? esc(med.next.slot) : "\u2014"}</b></div>
+    <div class="stat"><span class="label">${t("cTalks")}</span><b>${j.today_count}</b></div>`;
+
+  loadFamContacts();
+  loadFamTimeline();
+  loadFamDigest();
+}
+
+async function loadFamDigest() {
+  $("famDigest").innerHTML = `<span class="spinner"></span><span class="sub">${t("working")}</span>`;
+  try {
+    const j = await (await fetch(`/api/family/digest?resident_id=${state.residentId}&lang=${lang}`)).json();
+    $("famDigest").innerHTML = j.ok ? `<div class="note info">\ud83d\udcac ${esc(j.digest)}</div>` : "";
+  } catch (e) { $("famDigest").innerHTML = ""; }
+}
+
+async function loadFamTimeline() {
+  const j = await (await fetch(`/api/family/timeline?resident_id=${state.residentId}&days=14`)).json();
+  if (!j.ok) return;
+  $("famTimeline").innerHTML = `<table style="width:100%;border-collapse:collapse">
+    ${j.days.map(d => `<tr style="border-bottom:1px solid var(--line)">
+      <td style="padding:8px 6px">${esc(d.day)}</td>
+      <td style="padding:8px 6px"><b style="color:${scoreColor(d.wellbeing)}">${d.wellbeing ?? "\u2014"}</b></td>
+      <td style="padding:8px 6px">${d.medication ? `${d.medication.taken}/${d.medication.total}` : "\u2014"}</td>
+      <td style="padding:8px 6px" class="sub">${esc(d.summary || "")}</td>
+    </tr>`).join("")}</table>`;
+}
+
+async function loadFamContacts() {
+  const j = await (await fetch(`/api/contacts?resident_id=${state.residentId}`)).json();
+  $("famContactList").innerHTML = j.contacts.length ? j.contacts.map(c => `
+    <div class="row-item">
+      <div style="flex:1;min-width:170px">
+        <b>${esc(c.name)}</b>${c.is_primary ? `<span class="pill good">${t("fcMain")}</span>` : ""}
+        <div class="sub">${esc(c.relationship || "")}${c.relationship ? " \u00b7 " : ""}${esc(c.phone)}</div>
+      </div>
+      <a class="btn good" style="text-decoration:none"
+         href="tel:${esc((c.phone || "").replace(/[^\d+]/g, ""))}"
+         onclick="logCall(${c.id})">${t("fcCall")}</a>
+      <button class="btn ghost" onclick="famTogglePrimary(${c.id}, ${c.is_primary ? 0 : 1})">
+        ${c.is_primary ? t("fcUnsetMain") : t("fcSetMain")}</button>
+      <button class="btn bad" onclick="famDeleteContact(${c.id}, '${esc(c.name)}')">${t("fcDelete")}</button>
+    </div>`).join("") : `<p class="sub">${t("fcNone")}</p>`;
+}
+
+async function famAddContact() {
+  const name = $("fcName").value.trim(), phone = $("fcPhone").value.trim();
+  if (!name || !phone) { $("fcStatus").textContent = t("fcNeed"); return; }
+  const j = await (await fetch("/api/contacts", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, phone, relationship: $("fcRel").value.trim(),
+                           is_primary: $("fcPrimary").checked,
+                           resident_id: state.residentId })
+  })).json();
+  if (!j.ok) { $("fcStatus").textContent = j.message; return; }
+  ["fcName", "fcRel", "fcPhone"].forEach(id => $(id).value = "");
+  $("fcPrimary").checked = false;
+  $("fcStatus").textContent = t("fcAdded");
+  loadFamContacts();
+}
+
+async function famTogglePrimary(id, val) {
+  await fetch(`/api/contacts/${id}`, { method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_primary: val }) });
+  loadFamContacts();
+}
+
+async function famDeleteContact(id, name) {
+  if (!confirm(t("fcConfirm")(name))) return;
+  await fetch(`/api/contacts/${id}`, { method: "DELETE" });
+  loadFamContacts();
 }
 
 /* ================= MEDS ================= */
@@ -698,18 +1092,18 @@ async function loadMeds() {
   $("mNext").textContent = m.next ? m.next.slot : "—";
 
   $("medsAlert").innerHTML = (m.due && m.due.length)
-    ? `<div class="banner warn">⏰ ${m.due.map(d => esc(`${d.name} (${d.slot})`)).join(", ")}</div>` : "";
+    ? `<div class="note warn">⏰ ${m.due.map(d => esc(`${d.name} (${d.slot})`)).join(", ")}</div>` : "";
 
   $("medsList").innerHTML = m.doses.length ? m.doses.map(d => `
-    <div class="dose ${d.status === "taken" ? "taken" : ""}">
+    <div class="row-item ${d.status === "taken" ? "taken" : ""}">
       <div class="time">${d.slot}</div>
       <div style="flex:1;min-width:150px"><b>${esc(d.name)}</b>
-        ${d.status === "taken" ? `<span class="pill taken">${t("taken")}</span>` : ""}
+        ${d.status === "taken" ? `<span class="pill good">${t("taken")}</span>` : ""}
         <div class="sub">${esc([d.dose_amount, d.strength].filter(Boolean).join(" · "))}</div></div>
       ${d.status === "pending"
-        ? `<button class="btn green" onclick="dose(${d.med_id},'${d.day}','${d.slot}','taken')">${t("taken")}</button>
-           <button class="btn grey" onclick="dose(${d.med_id},'${d.day}','${d.slot}','skipped')">${t("skip")}</button>`
-        : `<button class="btn grey" onclick="dose(${d.med_id},'${d.day}','${d.slot}','undo')">${t("undo")}</button>`}
+        ? `<button class="btn good" onclick="dose(${d.med_id},'${d.day}','${d.slot}','taken')">${t("taken")}</button>
+           <button class="btn ghost" onclick="dose(${d.med_id},'${d.day}','${d.slot}','skipped')">${t("skip")}</button>`
+        : `<button class="btn ghost" onclick="dose(${d.med_id},'${d.day}','${d.slot}','undo')">${t("undo")}</button>`}
     </div>`).join("") : `<p class="sub">${t("nothingToday")}</p>`;
 }
 
@@ -748,11 +1142,11 @@ async function runRx(url, opts) {
 
 function renderRx() {
   const d = state.rxDraft;
-  if (!d || !d.medications.length) { $("rxReview").innerHTML = `<div class="banner warn">${t("noRx")}</div>`; return; }
-  $("rxReview").innerHTML = `<div class="banner warn"><b>${t("reviewRx")}</b></div>` +
-    (d.warnings || []).map(w => `<div class="banner warn">⚠ ${esc(w)}</div>`).join("") +
+  if (!d || !d.medications.length) { $("rxReview").innerHTML = `<div class="note warn">${t("noRx")}</div>`; return; }
+  $("rxReview").innerHTML = `<div class="note warn"><b>${t("reviewRx")}</b></div>` +
+    (d.warnings || []).map(w => `<div class="note warn">⚠ ${esc(w)}</div>`).join("") +
     d.medications.map((m, i) => `
-      <div class="c" style="margin-bottom:12px">
+      <div class="stat" style="margin-bottom:12px">
         <b style="font-size:18px">${esc(m.name)}</b>
         <div class="opts" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:10px">
           <div><div class="sub">${t("name")}</div><input type="text" id="rx_n_${i}" value="${esc(m.name)}"></div>
@@ -762,8 +1156,8 @@ function renderRx() {
           <div><div class="sub">${t("days")}</div><input type="text" id="rx_y_${i}" value="${esc(m.duration_days||"")}"></div>
         </div>
       </div>`).join("") +
-    `<button class="btn green" onclick="saveRx()">${t("saveRx")}</button>
-     <button class="btn grey" onclick="state.rxDraft=null;document.getElementById('rxReview').innerHTML=''">${t("cancel")}</button>`;
+    `<button class="btn good" onclick="saveRx()">${t("saveRx")}</button>
+     <button class="btn ghost" onclick="state.rxDraft=null;document.getElementById('rxReview').innerHTML=''">${t("cancel")}</button>`;
 }
 
 async function saveRx() {
@@ -779,7 +1173,7 @@ async function saveRx() {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ medications: meds }) })).json();
   if (j.ok) {
     state.rxDraft = null;
-    $("rxReview").innerHTML = `<div class="banner good">${t("savedN")(j.saved)}</div>`;
+    $("rxReview").innerHTML = `<div class="note good">${t("savedN")(j.saved)}</div>`;
     $("rxText").value = "";
     loadMeds();
   }
@@ -791,8 +1185,8 @@ async function makeReport() {
   $("repBtn").disabled = true;
   try {
     const j = await (await fetch(`/api/report?resident_id=${state.residentId}&lang=${lang}`)).json();
-    if (!j.ok) { $("repOut").innerHTML = `<div class="banner err">${esc(j.message)}</div>`; return; }
-    if (j.empty) { $("repOut").innerHTML = `<div class="banner info">${t("emptyReport")}</div>`; return; }
+    if (!j.ok) { $("repOut").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
+    if (j.empty) { $("repOut").innerHTML = `<div class="note info">${t("emptyReport")}</div>`; return; }
     $("repOut").innerHTML = `<pre class="report">${esc(j.report)}</pre>`;
   } finally { $("repStatus").textContent = ""; $("repBtn").disabled = false; }
 }

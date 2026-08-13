@@ -13,6 +13,7 @@ Brings together, in a single browser UI on one port:
 
 import io
 import os
+import sys
 import csv
 import json
 from datetime import datetime, date
@@ -25,6 +26,8 @@ import config
 import groq_api
 import engines
 import handsfree
+import family
+import calls
 import checkin as checkin_mod
 from store import Store
 
@@ -59,6 +62,9 @@ def api_health():
         "Voice emotion model not downloaded (1.2 GB). Run: cd voice_rec && python download_models.py",
         "face_note": None if st["face"] else
         "Face model not downloaded. Run: cd Face_rec && python download_models.py",
+        "handsfree_note": None if st["handsfree"] else
+        (f'Hands-free voice needs pipecat. Install it into THIS interpreter:\n'
+         f'    "{sys.executable}" -m pip install "pipecat-ai[webrtc,groq,silero]"'),
     })
 
 
@@ -282,8 +288,15 @@ def _system_prompt(resident, lang):
         "never give medical or medication advice; if health worries come up, "
         "warmly suggest telling a caregiver or nurse.\n"
     )
-    return base + (("日本語で返答してください。\n" + length_ja) if lang == "ja"
-                   else ("Reply in English.\n" + length_en))
+    # In a voice call the companion speaks first, so it needs to know how to
+    # open without waiting to be prompted.
+    opening = ("会話の最初はあなたから、短いあいさつと、"
+               "答えやすい一言の質問で始めてください。\n" if lang == "ja"
+               else "If you are speaking first, open with a short warm greeting "
+                    "and one easy question. One or two sentences.\n")
+    return base + opening + (("日本語で返答してください。\n" + length_ja)
+                             if lang == "ja"
+                             else ("Reply in English.\n" + length_en))
 
 
 def _reply(conversation_id, content, lang, audio_bytes=None):
@@ -326,16 +339,50 @@ def api_conv_messages(cid: int):
     return JSONResponse({"messages": store.messages(cid)})
 
 
+def _call_offer(cid, said, lang):
+    """If the resident asked to phone someone, describe the call to offer."""
+    conv = store.conversation(cid)
+    if conv is None:
+        return None
+    contact = calls.detect(said, store.contacts(conv["resident_id"]))
+    if not contact:
+        return None
+    return {
+        "contact_id": contact["id"],
+        "name": contact["name"],
+        "relationship": contact.get("relationship") or "",
+        "phone": contact["phone"],
+        "tel": calls.tel_link(contact["phone"]),
+        "say": calls.offer_text(contact, lang),
+    }
+
+
 @app.post("/api/conversation/{cid}/say")
 async def api_conv_say(cid: int, request: Request):
     body = await request.json()
     content = (body.get("content") or "").strip()
     if not content:
         return _err("Nothing to send.")
-    reply, err = _reply(cid, content, body.get("lang", "en"))
+    lang = body.get("lang", "en")
+    reply, err = _reply(cid, content, lang)
     if err:
         return _err(err)
-    return JSONResponse({"ok": True, "reply": reply})
+    return JSONResponse({"ok": True, "reply": reply,
+                         "call": _call_offer(cid, content, lang)})
+
+
+@app.post("/api/calls/{contact_id}/log")
+def api_log_call(contact_id: int, resident_id: int | None = None):
+    """Record that a call was started, for the family dashboard."""
+    if store.contact(contact_id) is None:
+        return _err("Unknown contact.")
+    store.log_call(contact_id, resident_id, "conversation")
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/contacts")
+def api_contacts(resident_id: int | None = None):
+    return JSONResponse({"contacts": store.contacts(resident_id)})
 
 
 @app.post("/api/conversation/{cid}/say_audio")
@@ -608,6 +655,74 @@ def api_report(day: str = "", resident_id: int | None = None, lang: str = "en"):
     return JSONResponse({"ok": True, "empty": False, "day": day, "report": text,
                          "checkins": len(checkins), "conversations": len(records),
                          "medication": meds})
+
+
+# --------------------------------------------------------------- family ---
+
+@app.get("/api/family/overview")
+def api_family_overview(resident_id: int, days: int = 14):
+    try:
+        data = family.overview(store, engines.get_med_store, resident_id, days)
+    except Exception as e:                    # noqa: BLE001
+        return _err(str(e), 500)
+    if data is None:
+        return _err("Unknown resident.", 404)
+    return JSONResponse({"ok": True, **data})
+
+
+@app.get("/api/family/timeline")
+def api_family_timeline(resident_id: int, days: int = 14):
+    try:
+        return JSONResponse({"ok": True, "days": family.timeline(
+            store, engines.get_med_store, resident_id, days)})
+    except Exception as e:                    # noqa: BLE001
+        return _err(str(e), 500)
+
+
+@app.get("/api/family/digest")
+def api_family_digest(resident_id: int, lang: str = "en"):
+    if not groq_api.ready():
+        return _err(groq_api.missing_key_message())
+    try:
+        data = family.overview(store, engines.get_med_store, resident_id)
+        if data is None:
+            return _err("Unknown resident.", 404)
+        return JSONResponse({"ok": True, "digest": family.digest(data, lang)})
+    except groq_api.GroqError as e:
+        return _err(str(e))
+    except Exception as e:                    # noqa: BLE001
+        return _err(str(e), 500)
+
+
+@app.post("/api/contacts")
+async def api_add_contact(request: Request):
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    phone = (body.get("phone") or "").strip()
+    if not name:
+        return _err("A name is required.")
+    if not phone:
+        return _err("A phone number is required.")
+    cid = store.add_contact(
+        name=name, phone=phone,
+        relationship=(body.get("relationship") or "").strip(),
+        resident_id=body.get("resident_id"),
+        email=(body.get("email") or "").strip(),
+        is_primary=bool(body.get("is_primary")),
+        notes=(body.get("notes") or "").strip())
+    return JSONResponse({"ok": True, "id": cid})
+
+
+@app.patch("/api/contacts/{contact_id}")
+async def api_update_contact(contact_id: int, request: Request):
+    body = await request.json()
+    return JSONResponse({"ok": store.update_contact(contact_id, body)})
+
+
+@app.delete("/api/contacts/{contact_id}")
+def api_delete_contact(contact_id: int):
+    store.delete_contact(contact_id)
+    return JSONResponse({"ok": True})
 
 
 @app.get("/api/export")

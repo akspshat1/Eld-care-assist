@@ -1,12 +1,11 @@
-"""Start the Elder Care Assistant and open it in your browser.
+"""Start the Family Dashboard and open it in your browser.
 
     python run.py            # start the server and open the browser
     python run.py --check    # verify setup without starting
-    python run.py --yes      # install missing packages without asking
-    python run.py --port 8200
+    python run.py --port 8400
 
-Launches with sys.executable -- the interpreter running this file -- so there
-is no python/python3 ambiguity and no shell involved.
+Reads the data written by eld_care_assist and med_mgmt, so those apps do not
+need to be running -- only to have been used at least once.
 """
 
 import os
@@ -17,18 +16,8 @@ import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# import name -> pip name
-REQUIRED = {
-    "fastapi": "fastapi",
-    "uvicorn": "uvicorn",
-    "requests": "requests",
-    "cv2": "opencv-python",
-    "onnxruntime": "onnxruntime",
-    "numpy": "numpy",
-    "PIL": "Pillow",
-}
-
-DEFAULT_PORT = 8100
+REQUIRED = {"fastapi": "fastapi", "uvicorn": "uvicorn", "requests": "requests"}
+DEFAULT_PORT = 8300
 
 
 def missing_packages():
@@ -46,7 +35,6 @@ def ensure_packages(assume_yes):
     missing = missing_packages()
     if not missing:
         return True
-
     print("Missing packages: " + ", ".join(missing))
     if not assume_yes:
         if not sys.stdin.isatty():
@@ -55,41 +43,30 @@ def ensure_packages(assume_yes):
             return False
         try:
             if input("Install them now? [Y/n] ").strip().lower() not in ("", "y", "yes"):
-                print("Skipped. The app cannot start without them.")
                 return False
         except EOFError:
             return False
-
     print("Installing...")
     if subprocess.run([sys.executable, "-m", "pip", "install", *missing]).returncode != 0:
-        print("pip failed.")
         return False
     return not missing_packages()
 
 
-def report_features():
-    """Say up front which optional pieces are present, without blocking."""
+def report_sources():
     sys.path.insert(0, HERE)
     import config
-    import engines
 
-    st = engines.status()
-    print(f"Groq key   : {'found' if st['groq'] else 'NOT SET'}")
-    if not st["groq"]:
-        print("             Check-in summaries, chat and reports need it.")
-        print(f"             Add GROQ_API_KEY to {config.ENV_PATH}")
-    print(f"Face model : {'ready' if st['face'] else 'missing'}"
-          + ("" if st["face"] else "   (cd Face_rec && python download_models.py)"))
-    print(f"Voice model: {'ready' if st['voice'] else 'missing'}"
-          + ("" if st["voice"] else "   (cd voice_rec && python download_models.py, 1.2 GB)"))
-    print(f"Medicines  : {'ready' if st['medications'] else 'missing'}")
-    print(f"Hands-free : {'ready' if st['handsfree'] else 'missing'}")
-    if not st["handsfree"]:
-        # Naming the interpreter matters: pipecat installed into a different
-        # Python is the usual reason this is missing.
-        print("             Voice conversation and the spoken check-in need it.")
-        print(f'             "{sys.executable}" -m pip install '
-              '"pipecat-ai[webrtc,groq,silero]"')
+    care = config.care_db_exists()
+    med = config.med_db_exists()
+    print(f"Care data  : {'found' if care else 'not found'}")
+    if not care:
+        print(f"             Expected at {config.CARE_DB}")
+        print("             Run eld_care_assist and complete one check-in first.")
+    print(f"Medicines  : {'found' if med else 'not found'}")
+    if not med:
+        print("             Add a prescription in med_mgmt or eld_care_assist.")
+    print(f"Groq key   : {'found' if config.groq_ready() else 'NOT SET'}"
+          + ("" if config.groq_ready() else "   (the written update needs it)"))
     return True
 
 
@@ -102,7 +79,7 @@ def main():
         try:
             port = int(args[args.index("--port") + 1])
         except (IndexError, ValueError):
-            print("--port needs a number, e.g. --port 8200")
+            print("--port needs a number, e.g. --port 8400")
             return 1
 
     print(f"Python : {sys.version.split()[0]}")
@@ -112,15 +89,14 @@ def main():
     if not ensure_packages(assume_yes):
         return 1
     print("Packages   : OK")
-
-    report_features()
+    report_sources()
 
     if check_only:
         print("\n--check passed. Run without --check to start.")
         return 0
 
     url = f"http://127.0.0.1:{port}"
-    print(f"\nElder Care Assistant is running at {url}")
+    print(f"\nFamily Dashboard is running at {url}")
     print("Press Ctrl+C to stop.\n")
     threading.Timer(1.2, lambda: webbrowser.open(url)).start()
 

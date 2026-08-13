@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Family Dashboard</title>
+<style>
+  :root{--bg:#f6f8fb;--card:#fff;--ink:#16202b;--muted:#66707d;--line:#e5eaf1;
+        --accent:#2f6fed;--accent2:#eef4ff;--good:#12a150;--warn:#dc2626;--amber:#d97706;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-size:16px;
+       font-family:"Segoe UI","Yu Gothic","Hiragino Kaku Gothic ProN",system-ui,sans-serif}
+  header{display:flex;align-items:center;justify-content:space-between;gap:14px;
+         padding:14px 22px;background:var(--card);border-bottom:1px solid var(--line);
+         position:sticky;top:0;z-index:20;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:9px;font-size:19px;font-weight:700}
+  select{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+  nav{display:flex;gap:4px;padding:12px 22px 0;flex-wrap:wrap}
+  nav button{border:none;background:transparent;font:inherit;font-weight:700;padding:10px 17px;
+             border-radius:10px 10px 0 0;cursor:pointer;color:var(--muted)}
+  nav button.on{background:var(--card);color:var(--ink)}
+  main{padding:0 22px 40px}
+  .panel{display:none;background:var(--card);border:1px solid var(--line);
+         border-radius:0 14px 14px 14px;padding:22px}
+  .panel.on{display:block}
+  h2{margin:0 0 3px;font-size:21px}
+  .sub{color:var(--muted);font-size:14px}
+  .hero{display:flex;gap:22px;align-items:center;flex-wrap:wrap;
+        border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  .ring{width:104px;height:104px;border-radius:50%;display:grid;place-items:center;
+        font-size:30px;font-weight:800;color:#fff;flex-shrink:0}
+  .hero .who{font-size:22px;font-weight:700}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:13px;margin:16px 0}
+  .c{border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+  .c .label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em}
+  .c b{display:block;font-size:22px;margin-top:5px}
+  .alert{display:flex;gap:12px;align-items:flex-start;border-radius:11px;
+         padding:13px 15px;margin-bottom:9px;font-weight:600}
+  .alert .ic{font-size:19px;line-height:1}
+  .alert.urgent{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+  .alert.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+  .alert.info{background:var(--accent2);color:#1d4ed8;border:1px solid #c7dbff}
+  .alert small{display:block;font-weight:400;opacity:.8;margin-top:3px}
+  .ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:11px;
+      padding:14px 16px;font-weight:600}
+  button.btn{font:inherit;font-weight:700;border:none;border-radius:10px;padding:12px 18px;
+             cursor:pointer;background:var(--accent);color:#fff}
+  button.btn.grey{background:#e9eef6;color:var(--ink)}
+  button.btn.green{background:var(--good)}
+  button.btn.red{background:var(--warn)}
+  a.call{display:inline-block;background:var(--good);color:#fff;font-weight:700;
+         padding:12px 18px;border-radius:10px;text-decoration:none}
+  button.ghost,a.ghost{font:inherit;padding:9px 14px;border:1px solid var(--line);
+        border-radius:9px;background:#fff;color:var(--ink);cursor:pointer;text-decoration:none}
+  input,textarea{font:inherit;padding:10px 12px;border:1px solid var(--line);
+        border-radius:9px;background:#fff;width:100%}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:14.5px}
+  th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .contact{display:flex;gap:14px;align-items:center;border:1px solid var(--line);
+           border-radius:12px;padding:14px 16px;margin-bottom:10px;flex-wrap:wrap}
+  .contact .who{flex:1;min-width:170px}
+  .contact .who b{font-size:17px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;
+        border-radius:99px;background:#eef2f6;color:var(--muted);margin-left:7px}
+  .pill.primary{background:#dcfce7;color:#15803d}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid #ccd8ea;
+           border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;
+           vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .bar{display:flex;align-items:flex-end;gap:4px;height:74px;margin-top:8px}
+  .bar div{flex:1;border-radius:4px 4px 0 0;min-height:3px}
+  .disc{font-size:12.5px;color:var(--muted);line-height:1.7;margin-top:20px;
+        border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">👨‍👩‍👧 <span>Family Dashboard</span></div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <select id="who"></select>
+    <button class="ghost" onclick="loadAll()">Refresh</button>
+  </div>
+</header>
+
+<nav>
+  <button class="on" data-tab="today">How they are</button>
+  <button data-tab="history">History</button>
+  <button data-tab="contacts">Contacts</button>
+</nav>
+
+<main>
+  <section class="panel on" id="today">
+    <div id="banner"></div>
+    <div class="hero" id="hero"></div>
+    <div id="digest"></div>
+    <h3 style="margin:20px 0 10px">Needs your attention</h3>
+    <div id="alerts"></div>
+    <div class="cards" id="cards"></div>
+    <div id="medBox"></div>
+    <h3 style="margin:22px 0 10px">Recent check-ins</h3>
+    <div id="recent"></div>
+    <p class="disc">
+      This dashboard summarises check-ins the resident did themselves, plus the
+      medication record. Mood readings from a photo or voice are weak signals and
+      can be wrong — they are shown as observations, not facts. Nothing here is a
+      diagnosis. If something worries you, phone them.
+    </p>
+  </section>
+
+  <section class="panel" id="history">
+    <div style="display:flex;gap:9px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <h2>Last 14 days</h2>
+      <a class="ghost" id="exportLink" href="#" style="margin-left:auto">Export CSV</a>
+    </div>
+    <div id="timeline"></div>
+  </section>
+
+  <section class="panel" id="contacts">
+    <h2>Contacts</h2>
+    <p class="sub">People they can reach. Saying “call my daughter” during a
+      conversation will offer to ring whoever is listed here.</p>
+    <div id="contactList" style="margin:16px 0"></div>
+    <div style="border:1px solid var(--line);border-radius:12px;padding:18px">
+      <h3 style="margin:0 0 12px">Add a contact</h3>
+      <div class="grid2">
+        <div><div class="sub">Name</div><input id="cName" placeholder="Kenji Tanaka"></div>
+        <div><div class="sub">Relationship</div><input id="cRel" placeholder="grandson"></div>
+        <div><div class="sub">Phone</div><input id="cPhone" placeholder="+81 90 1234 5678"></div>
+        <div><div class="sub">Email (optional)</div><input id="cEmail" placeholder=""></div>
+      </div>
+      <label class="sub" style="display:block;margin-top:11px">
+        <input type="checkbox" id="cPrimary" style="width:auto"> Main contact
+      </label>
+      <div style="margin-top:13px">
+        <button class="btn" onclick="addContact()">Add contact</button>
+        <span class="sub" id="cStatus" style="margin-left:10px"></span>
+      </div>
+    </div>
+    <h3 style="margin:22px 0 10px">Recent calls</h3>
+    <div id="callLog"></div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

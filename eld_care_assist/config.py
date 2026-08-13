@@ -86,6 +86,27 @@ GROQ_WHISPER_MODEL = WHISPER_MODEL
 GROQ_API_BASE = GROQ_BASE_URL
 CHROMA_PATH = os.path.join(DATA_DIR, "chroma")
 
+# --- names fam_dashboard's sources.py expects from a module called `config` ---
+# Its alert logic is reused for the Family tab (see family.py), and its
+# `import config` resolves here. These point at this app's own data.
+FAM_DIR = os.path.join(ROOT, "fam_dashboard")
+CARE_DIR = HERE
+CARE_DB = DB_PATH
+MED_DB = os.path.join(MED_DIR, "data", "medications.db")
+
+# Thresholds for what the family is told about.
+LOW_WELLBEING = int(os.environ.get("FAM_LOW_WELLBEING", "40"))
+QUIET_HOURS = int(os.environ.get("FAM_QUIET_HOURS", "36"))
+MISSED_DOSES_ALERT = int(os.environ.get("FAM_MISSED_DOSES", "2"))
+
+
+def care_db_exists():
+    return os.path.exists(CARE_DB)
+
+
+def med_db_exists():
+    return os.path.exists(MED_DB)
+
 
 def groq_ready():
     return bool(GROQ_API_KEY and GROQ_API_KEY.strip())

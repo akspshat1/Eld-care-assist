@@ -77,8 +77,19 @@ def install_hooks(store, system_prompt_fn):
             return                            # never store empty turns
         store.add_message(conversation_id, role, text)
 
+    def audio_sink(conversation_id, pcm, sample_rate):
+        """Keep the recording of a spoken turn, so its tone can be analysed.
+
+        Called straight after the turn's text was stored, so the newest user
+        message is the one this audio belongs to.
+        """
+        message_id = store.last_message_id(conversation_id, "user")
+        if message_id and pcm:
+            store.save_audio_pcm(conversation_id, message_id, pcm, sample_rate)
+
     vp.add_message = add_message
     vp.build_system_prompt = system_prompt_fn
+    vp.audio_sink = audio_sink
     return True
 
 
