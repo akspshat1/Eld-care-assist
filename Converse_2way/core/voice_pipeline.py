@@ -55,6 +55,13 @@ except ImportError:                           # older pipecat
 # attach the recording to the message it just wrote.
 audio_sink = None
 
+# A host app can set this to react to a finished turn and push something extra
+# to the browser over the data channel:
+#   app_message_hook(conversation_id, role, text) -> dict | None
+# Used for things the transcript alone cannot express, such as offering to
+# place a phone call the resident just asked for out loud.
+app_message_hook = None
+
 
 async def run_voice_bot(webrtc_connection, conversation_id, resident, lang="ja"):
     """Run one hands-free call for a conversation until the browser hangs up.
@@ -139,6 +146,14 @@ async def run_voice_bot(webrtc_connection, conversation_id, resident, lang="ja")
             return
         add_message(conversation_id, role, text)
         webrtc_connection.send_app_message({"role": role, "text": text})
+
+        if app_message_hook:
+            try:
+                extra = app_message_hook(conversation_id, role, text)
+                if extra:
+                    webrtc_connection.send_app_message(extra)
+            except Exception:                 # noqa: BLE001 - never break the call
+                pass
 
     # Note the signatures differ: the user handler is called with
     # (aggregator, strategy, message) while the assistant one gets

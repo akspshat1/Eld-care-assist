@@ -65,8 +65,12 @@ def connection_class():
     return SmallWebRTCConnection
 
 
-def install_hooks(store, system_prompt_fn):
-    """Point the imported pipeline at this app's store and prompt."""
+def install_hooks(store, system_prompt_fn, call_offer_fn=None):
+    """Point the imported pipeline at this app's store and prompt.
+
+    `call_offer_fn(conversation_id, text) -> dict | None` lets the host spot a
+    spoken request to phone someone and push the offer to the browser.
+    """
     vp = _load()
     if vp is None:
         return False
@@ -87,9 +91,17 @@ def install_hooks(store, system_prompt_fn):
         if message_id and pcm:
             store.save_audio_pcm(conversation_id, message_id, pcm, sample_rate)
 
+    def app_message_hook(conversation_id, role, text):
+        """Offer a phone call when the resident asks for one out loud."""
+        if role != "user" or not call_offer_fn:
+            return None
+        offer = call_offer_fn(conversation_id, text)
+        return {"type": "call", **offer} if offer else None
+
     vp.add_message = add_message
     vp.build_system_prompt = system_prompt_fn
     vp.audio_sink = audio_sink
+    vp.app_message_hook = app_message_hook
     return True
 
 

@@ -40,6 +40,12 @@ async function startHandsFreeCall(conversationId, opts = {}) {
   channel.onmessage = (event) => {
     try {
       const parsed = JSON.parse(event.data);
+      // The backend also pushes non-turn events, e.g. an offer to place a
+      // phone call the resident asked for out loud.
+      if (parsed && parsed.type === "call") {
+        if (opts.onCall) opts.onCall(parsed);
+        return;
+      }
       if (isTurn(parsed) && onTurn) onTurn(parsed);
     } catch { /* ignore non-JSON protocol frames */ }
   };

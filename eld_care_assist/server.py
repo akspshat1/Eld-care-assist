@@ -23,6 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import config
+import democlock
 import groq_api
 import engines
 import handsfree
@@ -37,6 +38,23 @@ app = FastAPI(title="Elder Care Assistant")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")),
           name="static")
 store = Store()
+
+# Demo clock: make the whole app's idea of "now" adjustable, so medicine
+# reminders and day boundaries can be triggered on demand. With no offset set
+# (the default) nothing behaves differently.
+def _install_demo_clock():
+    import store as _store_mod
+    modules = [_store_mod, sys.modules[__name__]]
+    try:
+        engines.get_med_store()               # puts med_mgmt on sys.path
+        import med_store
+        modules.append(med_store)             # so "due now" follows the clock
+    except Exception:                         # noqa: BLE001 - med app optional
+        pass
+    democlock.patch(*modules)
+
+
+_install_demo_clock()
 
 
 def _err(message, status=400):
@@ -400,7 +418,8 @@ async def api_conv_say_audio(cid: int, request: Request, lang: str = "en"):
     if err:
         return _err(err)
     return JSONResponse({"ok": True, "transcript": text, "reply": reply,
-                         "audio_saved": True})
+                         "audio_saved": True,
+                         "call": _call_offer(cid, text, lang)})
 
 
 @app.post("/api/conversation/{cid}/voice/offer")
@@ -426,7 +445,9 @@ async def api_voice_offer(cid: int, request: Request):
     if resident is None:
         return _err("Resident not found.")
 
-    handsfree.install_hooks(store, _system_prompt)
+    handsfree.install_hooks(
+        store, _system_prompt,
+        call_offer_fn=lambda cid, text: _call_offer(cid, text, lang))
 
     try:
         Connection = handsfree.connection_class()
@@ -556,6 +577,66 @@ async def api_meds_dose(request: Request):
     except (KeyError, ValueError) as e:
         return _err(f"Bad dose details: {e}")
     return JSONResponse({"ok": True})
+
+
+"""Words that confirm a dose was taken, or clearly refuse it.
+
+Matched locally first: the resident is standing there waiting, and a network
+round-trip to decide "yes" is both slow and needless.
+"""
+_TAKEN_WORDS = ["taken", "took", "i have", "ive taken", "yes", "yeah", "yep",
+                "done", "swallowed", "already", "finished",
+                "飲んだ", "飲みました", "のんだ", "はい", "はい飲みました", "済んだ"]
+_NOT_TAKEN_WORDS = ["not yet", "no", "haven't", "havent", "later", "in a minute",
+                    "wait", "まだ", "いいえ", "あとで", "後で"]
+
+
+@app.post("/api/medications/confirm_voice")
+async def api_meds_confirm_voice(request: Request, med_id: int = 0,
+                                 day: str = "", slot: str = "",
+                                 lang: str = "en"):
+    """Decide from a spoken reply whether a dose was taken, and mark it.
+
+    Returns taken=True only on a clear yes. Anything ambiguous leaves the dose
+    pending and the reminder keeps going -- silently marking a medicine as
+    taken because someone mumbled would be the worst possible failure here.
+    """
+    raw = await request.body()
+    if not raw:
+        return _err("No audio received.")
+    if not med_id or not day or not slot:
+        return _err("Missing dose details.")
+
+    try:
+        text = groq_api.transcribe(bytes(raw), "reply.wav", lang)
+    except groq_api.GroqError as e:
+        return _err(str(e))
+
+    said = (text or "").lower().strip()
+    if not said:
+        return JSONResponse({"ok": True, "transcript": "", "taken": False,
+                             "unclear": True})
+
+    refused = any(w in said for w in _NOT_TAKEN_WORDS)
+    confirmed = (not refused) and any(w in said for w in _TAKEN_WORDS)
+
+    if not confirmed and not refused:
+        # Indirect phrasing ("that's done", "I've had it") -- ask the model.
+        try:
+            data = groq_api.chat_json(
+                "Decide whether the person is saying they HAVE taken their "
+                "medicine. Answer true only if they clearly confirm taking it. "
+                'Return ONLY this JSON: {"taken": true or false}',
+                f'They said: "{text}"', max_tokens=60)
+            confirmed = bool(data.get("taken"))
+        except Exception:                     # noqa: BLE001
+            confirmed = False
+
+    if confirmed:
+        engines.get_med_store().mark(med_id, day, slot, "taken")
+
+    return JSONResponse({"ok": True, "transcript": text, "taken": confirmed,
+                         "unclear": not confirmed})
 
 
 @app.post("/api/medications/extract_text")
@@ -723,6 +804,30 @@ async def api_update_contact(contact_id: int, request: Request):
 def api_delete_contact(contact_id: int):
     store.delete_contact(contact_id)
     return JSONResponse({"ok": True})
+
+
+@app.get("/api/demo/clock")
+def api_demo_clock_get():
+    return JSONResponse({"ok": True, **democlock.state()})
+
+
+@app.post("/api/demo/clock")
+async def api_demo_clock_set(request: Request):
+    """Move the demo clock. Everything time-based follows it."""
+    body = await request.json()
+    if body.get("reset"):
+        democlock.reset()
+    elif "shift_seconds" in body:
+        democlock.shift(body["shift_seconds"])
+    elif "time" in body:
+        try:
+            hh, mm = str(body["time"]).split(":")[:2]
+            democlock.set_time(int(hh), int(mm))
+        except (ValueError, TypeError):
+            return _err("Time must look like HH:MM.")
+    else:
+        return _err("Nothing to change.")
+    return JSONResponse({"ok": True, **democlock.state()})
 
 
 @app.get("/api/export")

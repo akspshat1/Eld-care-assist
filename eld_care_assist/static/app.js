@@ -90,9 +90,21 @@ const T = {
   raTalk:"Have a chat", raTalkD:"Talk about anything. Just speak \u2014 no buttons.",
   raCheck:"Today's check-in", raCheckD:"A few gentle questions about how you feel.",
   trendTitle:"Wellbeing trend", famContactsHelp:"Saying \u201ccall my daughter\u201d in a conversation offers to ring them.",
-  nextMed:(n,t)=>`Next medicine: ${n} at ${t}`, noNextMed:"No more medicines today.",
+  nextMed:(n,t)=>`Next medicine: ${n} at ${t}`,
+  medDueNow:(n,t)=>`Time to take ${n} (due ${t})`,
+  medGaveUp:(n)=>`${n} was not confirmed. Marked as not taken \u2014 please check with them.`, noNextMed:"No more medicines today.",
   greetMorning:n=>`Good morning, ${n}.`, greetAfternoon:n=>`Good afternoon, ${n}.`,
   greetEvening:n=>`Good evening, ${n}.`,
+  medRemindTitle:"Time for your medicine",
+  medAnnounce:(n,d)=>`It's time to take ${n}${d ? ", " + d : ""}. Have you taken it?`,
+  medAsk:"Say \u201ctaken\u201d when you have had it.",
+  medListening:"Listening\u2026", medThanks:n=>`Thank you. ${n} marked as taken.`,
+  medUnclear:"I didn't catch that. I'll ask again in 5 minutes.",
+  medAgainIn:"I'll remind you again in 5 minutes.",
+  btnTaken:"\u2713 I've taken it", btnLater:"Not yet",
+  medRemindersOn:"Voice reminders on", medRemindersOff:"Voice reminders off",
+  dcReal:"Real time", dcDemo:"Demo time", dcClock:"Clock",
+  dcHint:"Type 8:05, 0805 or 8", dcBadTime:"Use a time like 8:05",
   micDenied:"Microphone unavailable. Check the browser's permission.",
   camDenied:"Camera unavailable. Check the browser's permission."
  },
@@ -179,10 +191,22 @@ const T = {
   raTalk:"お話しする", raTalkD:"何でもお話しください。ボタンは不要です。",
   raCheck:"今日の体調チェック", raCheckD:"かんたんな質問にお答えください。",
   trendTitle:"調子の推移", famContactsHelp:"会話中に「娘に電話」と言うとご案内します。",
-  nextMed:(n,t)=>`次のお薬：${n}（${t}）`, noNextMed:"今日のお薬は終わりました。",
+  nextMed:(n,t)=>`次のお薬：${n}（${t}）`,
+  medDueNow:(n,t)=>`${n}の時間です（${t}）`,
+  medGaveUp:(n)=>`${n}の確認が取れませんでした。未服用として記録しました。ご確認ください。`, noNextMed:"今日のお薬は終わりました。",
   greetMorning:n=>`${n}さん、おはようございます。`,
   greetAfternoon:n=>`${n}さん、こんにちは。`,
   greetEvening:n=>`${n}さん、こんばんは。`,
+  medRemindTitle:"お薬の時間です",
+  medAnnounce:(n,d)=>`${n}${d ? "、" + d : ""}の時間です。飲みましたか？`,
+  medAsk:"飲んだら「飲んだ」とお話しください。",
+  medListening:"お聴きしています…", medThanks:n=>`ありがとうございます。${n}を服用済みにしました。`,
+  medUnclear:"うまく聞き取れませんでした。5分後にまたお知らせします。",
+  medAgainIn:"5分後にまたお知らせします。",
+  btnTaken:"✓ 飲みました", btnLater:"まだです",
+  medRemindersOn:"音声でお知らせ：オン", medRemindersOff:"音声でお知らせ：オフ",
+  dcReal:"実時間", dcDemo:"デモ時間", dcClock:"時刻",
+  dcHint:"8:05 / 0805 / 8 のように入力", dcBadTime:"8:05 のように入力してください",
   micDenied:"マイクを使用できません。ブラウザの許可をご確認ください。",
   camDenied:"カメラを使用できません。ブラウザの許可をご確認ください。"
  }
@@ -212,6 +236,8 @@ function setLang(l) {
     if (typeof v === "string") el.placeholder = v;
   });
   $("brandName").textContent = t("brand");
+  const mv = $("medVoiceBtn");
+  if (mv) mv.textContent = medRemindersOn ? t("medRemindersOn") : t("medRemindersOff");
   loadQuestions();
   refreshTab();
 }
@@ -224,6 +250,11 @@ document.querySelectorAll("nav button").forEach(b => {
 /* Two audiences, one app: the resident gets a calm two-choice home, the care
    team gets the data. Tabs are filtered by mode rather than shown all at once. */
 let mode = localStorage.getItem("eca_mode") || "resident";
+// Declared here, not with the reminder code below: setLang() runs during
+// boot and reads it, and a `let` further down the file would still be in
+// its temporal dead zone -- which threw and aborted boot before the
+// residents had loaded.
+let medRemindersOn = localStorage.getItem("eca_med_voice") !== "off";
 
 function setMode(m) {
   mode = m;
@@ -291,6 +322,8 @@ function refreshTab() {
   await loadQuestions();
   // Applies the saved mode, filters the tabs and opens that mode's home.
   setMode(mode);
+  clockPoll();
+  medicineTick();          // check straight away, then every 30s
 })();
 
 
@@ -304,11 +337,13 @@ async function loadResidentHome() {
   // One useful, non-nagging line: what is coming next.
   try {
     const m = await (await fetch("/api/medications/today")).json();
-    const due = (m.due || [])[0];
+    // Only a dose near its scheduled time counts as "now"; older ones are
+    // missed doses, shown to the care team rather than nagged about here.
+    const due = (m.due || []).find(d => (d.late_minutes ?? 0) <= MED_REMIND_WINDOW_MIN);
     const next = m.next;
     if (due) {
       $("residentNext").innerHTML =
-        `<div class="note warn"><span class="ic">\u23f0</span><div>${esc(t("nextMed")(due.name, due.slot))}</div></div>`;
+        `<div class="note warn"><span class="ic">\u23f0</span><div>${esc(t("medDueNow")(due.name, due.slot))}</div></div>`;
     } else if (next) {
       $("residentNext").innerHTML =
         `<div class="note info"><span class="ic">\ud83d\udc8a</span><div>${esc(t("nextMed")(next.name, next.slot))}</div></div>`;
@@ -462,6 +497,8 @@ function makeRecorder() {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
       ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // Same reason as in voice.js: a suspended context never delivers audio.
+      if (ctx.state === "suspended") { try { await ctx.resume(); } catch (e) {} }
       src = ctx.createMediaStreamSource(stream);
       node = ctx.createScriptProcessor(4096, 1, 1);
       chunks = [];
@@ -738,6 +775,7 @@ async function toggleChatRec() {
       addBubble("user", j.transcript);
       addBubble("assistant", j.reply);
       speak(j.reply);
+      showCallOffer(j.call);
     } catch (e) { $("talkError").innerHTML = `<div class="note bad">${esc(String(e))}</div>`; }
   } else {
     try {
@@ -775,6 +813,8 @@ async function toggleHandsFree() {
       },
       // The resident started talking: stop the assistant talking over them.
       onUserSpeaking: shutUp,
+      // They asked out loud to phone someone; the backend spotted who.
+      onCall: (c) => showCallOffer(c),
       onLevel: (v) => { $("hfLevel").style.width = `${Math.round(v * 100)}%`; },
     });
     btn.className = "btn red";
@@ -1081,6 +1121,253 @@ async function famDeleteContact(id, name) {
   await fetch(`/api/contacts/${id}`, { method: "DELETE" });
   loadFamContacts();
 }
+
+
+
+/* ================= DEMO CLOCK =================
+   Shifts the server's idea of "now" so reminders can be triggered on cue.
+   Everything time-based follows it, because the server decides what is due. */
+
+let clockState = null;
+
+async function clockPost(body) {
+  try {
+    const j = await (await fetch("/api/demo/clock", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body) })).json();
+    if (j.ok) {
+      clockState = j;
+      paintClock();
+      // A jump usually means "fire the reminder now" -- re-check immediately
+      // instead of waiting for the next poll, and allow a repeat ask.
+      for (const k in medLastAsked) delete medLastAsked[k];
+      medicineTick();
+      refreshTab();
+    }
+  } catch (e) { /* server not reachable */ }
+}
+
+const clockShift = (secs) => clockPost({ shift_seconds: secs });
+const clockReset = () => clockPost({ reset: true });
+
+/* Forgiving time parsing: someone demoing should be able to type "8", "805",
+   "8:5" or "08:05" and have it mean 08:05, not get an error. */
+function parseClockInput(raw) {
+  const txt = String(raw || "").trim();
+  if (!txt) return null;
+  let h, m;
+  const withColon = txt.match(/^(\d{1,2})\s*[:.\uff1a]\s*(\d{1,2})$/);
+  const digits = txt.replace(/\D/g, "");
+  // No digits at all is a typo, not midnight -- "abc" must not set 00:00.
+  if (!withColon && !digits) return null;
+  if (withColon) {
+    h = +withColon[1]; m = +withColon[2];
+  } else if (digits.length <= 2) {
+    h = +digits; m = 0;                       // "8" -> 08:00
+  } else if (digits.length === 3) {
+    h = +digits.slice(0, 1); m = +digits.slice(1);   // "805" -> 08:05
+  } else if (digits.length === 4) {
+    h = +digits.slice(0, 2); m = +digits.slice(2);   // "0805" -> 08:05
+  } else {
+    return null;
+  }
+  if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return null;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function clockSet(raw) {
+  const hhmm = parseClockInput(raw);
+  const hint = $("dcHint");
+  if (!hhmm) {
+    if (hint && String(raw || "").trim()) hint.textContent = t("dcBadTime");
+    return;
+  }
+  if (hint) hint.textContent = t("dcHint");
+  clockPost({ time: hhmm });
+}
+
+/* Open the panel and put the caret straight in the field, so the clock is
+   writable in one click rather than two. */
+function openClockEditor() {
+  const box = $("demoClock");
+  box.classList.toggle("open");
+  if (box.classList.contains("open")) {
+    const input = $("dcInput");
+    input.value = clockState ? clockState.time : "";
+    setTimeout(() => { input.focus(); input.select(); }, 30);
+  }
+}
+
+function paintClock() {
+  if (!clockState) return;
+  const box = $("demoClock");
+  $("dcTime").textContent = clockState.time;
+  box.classList.toggle("shifted", !!clockState.shifted);
+  const input = $("dcInput");
+  if (input && document.activeElement !== input) input.value = clockState.time;
+  $("dcTag").textContent = clockState.shifted ? t("dcDemo") : t("dcClock");
+}
+
+async function clockPoll() {
+  try {
+    const j = await (await fetch("/api/demo/clock")).json();
+    if (j.ok) { clockState = j; paintClock(); }
+  } catch (e) { /* ignore */ }
+}
+setInterval(clockPoll, 10000);
+
+/* ================= MEDICINE VOICE REMINDERS =================
+   Announces a dose when it falls due, listens for "taken", marks it, and
+   otherwise repeats every 5 minutes.
+
+   Runs app-wide rather than on the Medicines tab: the resident will be on the
+   Home screen, not looking at a medication list. It only speaks when a dose is
+   actually due, so it stays quiet the rest of the time. */
+
+const MED_REPEAT_MS = 5 * 60 * 1000;   // ask again after 5 minutes
+const MED_POLL_MS = 30 * 1000;         // how often we check for a due dose
+
+/* Ask at most this many times, then stop and record it as not taken. Endless
+   reminding is worse than useless: the resident tunes it out, and the record
+   still claims the dose is merely "pending" when in truth nobody confirmed it.
+   Five attempts five minutes apart is about twenty minutes of trying. */
+const MED_MAX_ASKS = 5;
+
+/* How late a dose can be and still be announced out loud. due_now() keeps
+   returning any pending dose for the rest of the day, so without this an 08:00
+   dose nobody marked would still be announcing itself at 8pm. */
+const MED_REMIND_WINDOW_MIN = 120;
+
+let medAsking = false;                  // one announcement at a time
+const medLastAsked = {};                // dose key -> timestamp
+const medAskCount = {};                 // dose key -> how many times asked
+
+const doseKey = d => `${d.med_id}|${d.day}|${d.slot}`;
+
+function medBanner(html) {
+  const box = $("medReminder");
+  if (box) box.innerHTML = html;
+}
+
+async function medicineTick() {
+  if (!medRemindersOn || medAsking || !state.residentId) return;
+  let m;
+  try { m = await (await fetch("/api/medications/today")).json(); }
+  catch (e) { return; }
+
+  const due = (m.due || []).filter(d => {
+    const k = doseKey(d);
+    if ((d.late_minutes ?? 0) > MED_REMIND_WINDOW_MIN) return false;
+    if ((medAskCount[k] || 0) >= MED_MAX_ASKS) return false;   // given up
+    const last = medLastAsked[k];
+    return !last || Date.now() - last >= MED_REPEAT_MS;
+  });
+  if (!due.length) { if (!medAsking) medBanner(""); return; }
+
+  await askAboutDose(due[0]);
+}
+
+async function askAboutDose(dose) {
+  medAsking = true;
+  const key = doseKey(dose);
+  medLastAsked[key] = Date.now();
+  medAskCount[key] = (medAskCount[key] || 0) + 1;
+  const lastAttempt = medAskCount[key] >= MED_MAX_ASKS;
+  const label = [dose.dose_amount, dose.strength].filter(Boolean).join(" ");
+
+  medBanner(`
+    <div class="note warn" style="align-items:center">
+      <span class="ic">\u23f0</span>
+      <div style="flex:1">
+        <b>${esc(t("medRemindTitle"))}</b>
+        <div style="font-size:1.05rem;margin-top:2px">${esc(dose.name)} ${esc(label)} \u00b7 ${esc(dose.slot)}</div>
+        <small id="medPrompt">${esc(t("medAsk"))}</small>
+        <div class="meter" style="margin-top:6px"><i id="medLevel"></i></div>
+      </div>
+      <button class="btn good" onclick="confirmDoseTaken(${dose.med_id},'${dose.day}','${dose.slot}')">${t("btnTaken")}</button>
+      <button class="btn ghost" onclick="dismissDose()">${t("btnLater")}</button>
+    </div>`);
+
+  try {
+    await say(t("medAnnounce")(dose.name, label), lang);
+    const prompt = $("medPrompt");
+    if (prompt) prompt.textContent = t("medListening");
+
+    const blob = await listenOnce(12000, (v) => {
+      const bar = $("medLevel");
+      if (bar) bar.style.width = `${Math.round(v * 100)}%`;
+    });
+    if (!blob) {                              // said nothing
+      if (lastAttempt) { await giveUpOnDose(dose); return; }
+      if (prompt) prompt.textContent = t("medAgainIn");
+      return;
+    }
+    const url = `/api/medications/confirm_voice?med_id=${dose.med_id}`
+              + `&day=${dose.day}&slot=${encodeURIComponent(dose.slot)}&lang=${lang}`;
+    const j = await (await fetch(url, { method: "POST", body: blob })).json();
+
+    if (j.ok && j.taken) {
+      await say(t("medThanks")(dose.name), lang);
+      medBanner(`<div class="note good"><span class="ic">\u2713</span><div>${esc(t("medThanks")(dose.name))}</div></div>`);
+      setTimeout(() => medBanner(""), 6000);
+      delete medAskCount[key];
+      if (currentTab() === "meds") loadMeds();
+      if (currentTab() === "residentHome") loadResidentHome();
+    } else if (lastAttempt) {
+      await giveUpOnDose(dose);
+    } else {
+      if (prompt) prompt.textContent = t("medUnclear");
+      await say(t("medUnclear"), lang);
+    }
+  } catch (e) {
+    /* leave the card up; the 5-minute repeat will try again */
+  } finally {
+    medAsking = false;
+  }
+}
+
+/* After the last attempt, stop asking and record the truth: nobody confirmed
+   this dose. It is marked "skipped" rather than "taken" so the care team and
+   the family dashboard see it as missed -- assuming it was swallowed because
+   the resident went quiet would be the dangerous choice. */
+async function giveUpOnDose(dose) {
+  await fetch("/api/medications/dose", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ med_id: dose.med_id, day: dose.day,
+                           slot: dose.slot, status: "skipped" }) });
+  medBanner(`<div class="note bad"><span class="ic">\u26a0</span><div>${esc(t("medGaveUp")(dose.name))}</div></div>`);
+  setTimeout(() => medBanner(""), 12000);
+  if (currentTab() === "meds") loadMeds();
+  if (currentTab() === "residentHome") loadResidentHome();
+}
+
+/* Tapping the button is always available -- voice is an addition, not a
+   requirement, and a resident may simply prefer to press it. */
+async function confirmDoseTaken(med_id, day, slot) {
+  await fetch("/api/medications/dose", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ med_id, day, slot, status: "taken" }) });
+  shutUp();
+  medBanner(`<div class="note good"><span class="ic">\u2713</span><div>${esc(t("medThanks")(""))}</div></div>`);
+  setTimeout(() => medBanner(""), 5000);
+  if (currentTab() === "meds") loadMeds();
+  if (currentTab() === "residentHome") loadResidentHome();
+}
+
+function dismissDose() {
+  shutUp();
+  medBanner("");
+}
+
+function toggleMedReminders() {
+  medRemindersOn = !medRemindersOn;
+  localStorage.setItem("eca_med_voice", medRemindersOn ? "on" : "off");
+  const b = $("medVoiceBtn");
+  if (b) b.textContent = medRemindersOn ? t("medRemindersOn") : t("medRemindersOff");
+  if (!medRemindersOn) { shutUp(); medBanner(""); }
+}
+
+setInterval(medicineTick, MED_POLL_MS);
 
 /* ================= MEDS ================= */
 async function loadMeds() {

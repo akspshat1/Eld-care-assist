@@ -283,6 +283,41 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
   .card{padding:var(--s4)}
   .msg{max-width:88%}
 }
+
+/* ---------------- demo clock ----------------
+   Bottom-right, deliberately unobtrusive until opened. It shifts the server's
+   idea of "now", so medicine reminders can be triggered on cue. */
+.democlock{
+  position:fixed; right:18px; bottom:18px; z-index:60;
+  background:var(--surface); border:1px solid var(--line-2);
+  border-radius:var(--r-md); box-shadow:var(--shadow-lg);
+  font-size:.85rem; overflow:hidden; min-width:132px;
+}
+.democlock.shifted{border-color:var(--warn); box-shadow:0 0 0 3px var(--warn-soft), var(--shadow-lg)}
+.democlock .face{
+  display:flex; align-items:center; gap:9px; padding:9px 13px; cursor:pointer;
+  user-select:none;
+}
+.democlock .t{font-size:1.25rem; font-weight:750; font-variant-numeric:tabular-nums;
+              letter-spacing:-.01em}
+.democlock .tag{font-size:.6rem; font-weight:700; letter-spacing:.06em;
+                text-transform:uppercase; color:var(--ink-3)}
+.democlock.shifted .tag{color:var(--warn)}
+.democlock .body{display:none; border-top:1px solid var(--line);
+                 padding:11px 13px; background:var(--surface-2)}
+.democlock.open .body{display:block}
+.democlock .rowb{display:flex; gap:5px; margin-bottom:7px}
+.democlock .rowb button{
+  flex:1; font:inherit; font-size:.76rem; font-weight:650; padding:7px 4px;
+  border:1px solid var(--line-2); background:var(--surface); color:var(--ink);
+  border-radius:8px; cursor:pointer;
+}
+.democlock .rowb button:hover{background:var(--brand-soft); border-color:var(--brand)}
+.democlock input[type=time]{
+  font:inherit; font-size:.85rem; padding:6px 8px; width:100%;
+  border:1px solid var(--line-2); border-radius:8px; background:var(--surface);
+}
+@media (max-width:640px){ .democlock{right:10px; bottom:10px} }
 </style>
 </head>
 <body data-mode="resident">
@@ -313,6 +348,8 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
   <button data-tab="family" data-for="care"><span class="ic">👪</span><span data-i="tabFamily">Family</span></button>
   <button data-tab="report" data-for="care"><span class="ic">📋</span><span data-i="tabReport">Report</span></button>
 </nav>
+
+<div id="medReminder" style="padding:0 var(--s5); max-width:1160px"></div>
 
 <main>
 
@@ -510,6 +547,9 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
   <section class="panel" id="meds">
     <div class="card-head"><h2 data-i="medsTitle">Medicines</h2></div>
     <div id="medsAlert"></div>
+    <div style="margin:var(--s3) 0">
+      <button class="btn ghost" id="medVoiceBtn" onclick="toggleMedReminders()">Voice reminders on</button>
+    </div>
     <div class="stats" style="margin:var(--s4) 0">
       <div class="stat"><div class="k" data-i="mScheduled">Scheduled</div><div class="v" id="mTotal">—</div></div>
       <div class="stat"><div class="k" data-i="mTaken">Taken</div><div class="v" id="mTaken">—</div></div>
@@ -594,5 +634,36 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
 <script src="/static/voice.js"></script>
 <script src="/static/webrtc.js"></script>
 <script src="/static/app.js"></script>
+
+<div class="democlock" id="demoClock">
+  <div class="face" onclick="openClockEditor()">
+    <div>
+      <div class="tag" id="dcTag">Clock</div>
+      <div class="t" id="dcTime">--:--</div>
+    </div>
+    <span style="margin-left:auto; color:var(--ink-3)">⚙</span>
+  </div>
+  <div class="body">
+    <div class="rowb">
+      <button onclick="clockShift(-3600)">−1h</button>
+      <button onclick="clockShift(-300)">−5m</button>
+      <button onclick="clockShift(300)">+5m</button>
+      <button onclick="clockShift(3600)">+1h</button>
+    </div>
+    <div style="display:flex; gap:5px">
+      <input type="text" id="dcInput" inputmode="numeric" autocomplete="off"
+             placeholder="08:05"
+             onkeydown="if(event.key==='Enter'){clockSet(this.value); this.blur();}"
+             onblur="clockSet(this.value)">
+      <button onclick="clockSet(document.getElementById('dcInput').value)"
+              style="flex:0 0 auto; padding:7px 11px">Set</button>
+    </div>
+    <div class="tiny" id="dcHint" style="margin-top:5px">Type 8:05, 0805 or 8</div>
+    <div class="rowb" style="margin-top:7px; margin-bottom:0">
+      <button onclick="clockReset()" data-i="dcReal">Real time</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

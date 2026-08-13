@@ -67,6 +67,12 @@ class VoiceLoop {
                noiseSuppression: true, autoGainControl: true },
     });
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // An AudioContext created outside a click starts suspended, and then
+    // onaudioprocess never fires -- the mic looks dead. The medicine reminder
+    // starts listening from a timer, so this resume is what makes it work.
+    if (this.ctx.state === "suspended") {
+      try { await this.ctx.resume(); } catch (e) { /* older browsers */ }
+    }
     this.src = this.ctx.createMediaStreamSource(this.stream);
     this.node = this.ctx.createScriptProcessor(2048, 1, 1);
     this.rate = this.ctx.sampleRate;
@@ -219,4 +225,37 @@ async function say(text, lang) {
 
 function shutUp() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+}
+
+/**
+ * Listen for a single spoken reply, then stop.
+ *
+ * Used by the medicine reminder: it asks a question aloud and needs one
+ * answer, not a conversation. Resolves with a WAV Blob, or null if nothing
+ * was said before the timeout.
+ */
+function listenOnce(timeoutMs = 12000, onLevel = null) {
+  return new Promise(async (resolve) => {
+    let loop, timer, done = false;
+
+    const finish = (blob) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { loop && loop.stop(); } catch (e) {}
+      resolve(blob);
+    };
+
+    try {
+      loop = new VoiceLoop({
+        onLevel: onLevel || (() => {}),
+        onTurn: (blob) => finish(blob),
+      });
+      await loop.start();
+    } catch (e) {
+      finish(null);                            // no microphone permission
+      return;
+    }
+    timer = setTimeout(() => finish(null), timeoutMs);
+  });
 }
