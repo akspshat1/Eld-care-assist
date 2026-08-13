@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elder Care Assistant</title>
+<style>
+  :root{--bg:#f5f7fa;--card:#fff;--ink:#1b2430;--muted:#6b7280;--line:#e4e9f0;
+        --accent:#2563eb;--accent2:#eff5ff;--good:#16a34a;--warn:#dc2626;--amber:#d97706;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-size:17px;
+       font-family:"Segoe UI","Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",system-ui,sans-serif}
+  header{display:flex;align-items:center;justify-content:space-between;gap:14px;
+         padding:14px 24px;background:var(--card);border-bottom:1px solid var(--line);
+         position:sticky;top:0;z-index:20;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+  .brand span{font-size:24px}
+  .hr{display:flex;align-items:center;gap:12px}
+  select.person{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+  .langtog{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .langtog button{border:none;background:#fff;font:inherit;font-size:13px;font-weight:700;
+                  padding:8px 12px;cursor:pointer;color:var(--muted)}
+  .langtog button.on{background:var(--accent);color:#fff}
+  nav{display:flex;gap:4px;padding:12px 24px 0;flex-wrap:wrap;background:var(--bg)}
+  nav button{border:none;background:transparent;font:inherit;font-weight:700;padding:11px 18px;
+             border-radius:10px 10px 0 0;cursor:pointer;color:var(--muted);display:flex;gap:8px;align-items:center}
+  nav button.on{background:var(--card);color:var(--ink)}
+  main{padding:0 24px 44px}
+  .panel{display:none;background:var(--card);border:1px solid var(--line);
+         border-radius:0 14px 14px 14px;padding:24px}
+  .panel.on{display:block}
+  h2{margin:0 0 4px;font-size:22px}
+  .sub{color:var(--muted);font-size:14px}
+  .row{display:flex;gap:22px;flex-wrap:wrap}
+  .col{flex:1;min-width:280px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px}
+  .c{border:1px solid var(--line);border-radius:12px;padding:15px 16px;background:#fff}
+  .c .label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em}
+  .c b{display:block;font-size:23px;margin-top:5px}
+  button.btn{font:inherit;font-weight:700;border:none;border-radius:11px;padding:14px 20px;
+             cursor:pointer;background:var(--accent);color:#fff}
+  button.btn.grey{background:#e8edf4;color:var(--ink)}
+  button.btn.green{background:var(--good)}
+  button.btn.red{background:var(--warn)}
+  button.btn:disabled{background:#ccd4de;cursor:not-allowed}
+  button.ghost,a.ghost{font:inherit;padding:10px 15px;border:1px solid var(--line);
+        border-radius:10px;background:#fff;color:var(--ink);cursor:pointer;text-decoration:none}
+  input[type=text],textarea,select{font:inherit;padding:11px 13px;border:1px solid var(--line);
+        border-radius:10px;background:#fff;width:100%}
+  textarea{min-height:130px;resize:vertical}
+  .banner{border-radius:11px;padding:14px 16px;margin-bottom:16px;font-weight:600}
+  .banner.err{background:#fef2f2;color:var(--warn);border:1px solid #fecaca}
+  .banner.info{background:var(--accent2);color:#1d4ed8;border:1px solid #bfdbfe}
+  .banner.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+  .banner.good{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+  /* check-in */
+  .step{border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:14px}
+  .step h3{margin:0 0 14px;font-size:19px}
+  .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .opt{border:2px solid var(--line);border-radius:12px;padding:16px 12px;text-align:center;
+       cursor:pointer;background:#fff;font:inherit;font-size:16px;transition:.12s}
+  .opt:hover{border-color:#c7d6ec}
+  .opt.on{border-color:var(--accent);background:var(--accent2);font-weight:700}
+  .opt .ic{display:block;font-size:26px;margin-bottom:6px}
+  .opt.urgent.on{border-color:var(--warn);background:#fef2f2}
+  video,canvas.snap{width:100%;max-width:380px;border-radius:12px;background:#111;display:block}
+  .prog{height:9px;background:#e8edf4;border-radius:99px;overflow:hidden;margin:14px 0}
+  .prog i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+  .score{font-size:52px;font-weight:800;line-height:1}
+  /* chat */
+  .chat{border:1px solid var(--line);border-radius:12px;padding:16px;height:340px;
+        overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#fcfdff}
+  .msg{max-width:78%;padding:11px 14px;border-radius:13px;font-size:16px;line-height:1.5}
+  .msg.user{align-self:flex-end;background:var(--accent);color:#fff}
+  .msg.bot{align-self:flex-start;background:#eef2f7}
+  .msg .tone{display:block;font-size:11px;opacity:.75;margin-top:5px}
+  .composer{display:flex;gap:9px;margin-top:12px}
+  .dose{display:flex;align-items:center;gap:14px;border:1px solid var(--line);
+        border-radius:12px;padding:14px 16px;margin-bottom:10px}
+  .dose .time{font-size:22px;font-weight:700;width:82px}
+  .dose.taken{background:#f0fdf4;border-color:#bbf7d0}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;
+        border-radius:99px;background:#eef2f6;color:var(--muted);margin-left:7px}
+  .pill.taken{background:#dcfce7;color:#15803d}
+  pre.report{white-space:pre-wrap;font:inherit;background:#fcfdff;border:1px solid var(--line);
+             border-radius:12px;padding:18px;line-height:1.65}
+  .disc{font-size:12.5px;color:var(--muted);line-height:1.7;margin-top:20px;
+        border-top:1px solid var(--line);padding-top:14px}
+  .spinner{display:inline-block;width:15px;height:15px;border:2px solid #c9d6ea;
+           border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;
+           vertical-align:-2px;margin-right:7px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .hide{display:none !important}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span>🌷</span><span id="brandName">Elder Care Assistant</span></div>
+  <div class="hr">
+    <select class="person" id="who"></select>
+    <div class="langtog">
+      <button id="langEn" class="on" onclick="setLang('en')">EN</button>
+      <button id="langJa" onclick="setLang('ja')">日本語</button>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button class="on" data-tab="home"><span>🏠</span><span data-i="tabHome">Today</span></button>
+  <button data-tab="checkin"><span>🩺</span><span data-i="tabCheckin">Check-in</span></button>
+  <button data-tab="talk"><span>💬</span><span data-i="tabTalk">Talk</span></button>
+  <button data-tab="meds"><span>💊</span><span data-i="tabMeds">Medicines</span></button>
+  <button data-tab="report"><span>📋</span><span data-i="tabReport">Report</span></button>
+</nav>
+
+<main>
+  <!-- ================= TODAY ================= -->
+  <section class="panel on" id="home">
+    <div id="homeAlerts"></div>
+    <h2 data-i="todayTitle">Today at a glance</h2>
+    <p class="sub" id="homeGreeting"></p>
+    <div class="cards" style="margin:18px 0">
+      <div class="c"><span class="label" data-i="cWellbeing">WELLBEING</span><b id="hWell">—</b></div>
+      <div class="c"><span class="label" data-i="cLastCheck">LAST CHECK-IN</span><b id="hLast">—</b></div>
+      <div class="c"><span class="label" data-i="cMeds">MEDICINES TODAY</span><b id="hMeds">—</b></div>
+      <div class="c"><span class="label" data-i="cTalks">CONVERSATIONS</span><b id="hTalks">—</b></div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <h3 data-i="quickStart">Quick start</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" onclick="go('checkin')" data-i="btnStartCheckin">Start today's check-in</button>
+          <button class="btn grey" onclick="go('talk')" data-i="btnTalk">Have a chat</button>
+          <button class="btn grey" onclick="go('meds')" data-i="btnMeds">Medicines</button>
+        </div>
+        <div id="homeTrend" style="margin-top:22px"></div>
+      </div>
+      <div class="col">
+        <h3 data-i="recentTitle">Recent check-ins</h3>
+        <div id="homeRecent"></div>
+      </div>
+    </div>
+    <p class="disc" data-i="disclaimer">This app supports care — it does not provide diagnosis or medical advice. Emotion readings from a photo or voice are weak signals and can be wrong. Always rely on a person's own words and a caregiver's judgement, and contact medical help for anything urgent.</p>
+  </section>
+
+  <!-- ================= CHECK-IN ================= -->
+  <section class="panel" id="checkin">
+    <h2 data-i="checkinTitle">Daily condition check-in</h2>
+    <p class="sub" data-i="checkinSub">A few simple questions, then an optional photo and voice note.</p>
+
+    <div class="step" id="voiceCheckStep" style="background:#fbfdff">
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <button class="btn" id="vcBtn" onclick="toggleVoiceCheckin()" style="font-size:18px;padding:16px 22px">
+          <span data-i="btnVoiceCheckin">🎙 Answer by talking</span>
+        </button>
+        <div style="flex:1;min-width:200px">
+          <div class="sub" id="vcStatus" data-i="vcIdle">The app will read each question aloud and listen for your answer.</div>
+          <div class="prog" style="margin:9px 0 0"><i id="vcLevel" style="background:var(--good)"></i></div>
+        </div>
+      </div>
+      <div id="vcHeard" style="margin-top:12px;max-height:230px;overflow-y:auto;display:flex;flex-direction:column"></div>
+    </div>
+
+    <div class="prog"><i id="ciProg"></i></div>
+    <div id="ciQuestions"></div>
+
+    <div class="step">
+      <h3><span data-i="stepPhoto">Photo (optional)</span></h3>
+      <p class="sub" data-i="photoHelp">A quick photo lets the app note the facial expression. The photo is never saved.</p>
+      <div class="row" style="margin-top:12px">
+        <div class="col">
+          <video id="ciVideo" autoplay playsinline muted class="hide"></video>
+          <canvas id="ciCanvas" class="snap hide"></canvas>
+          <div style="display:flex;gap:9px;margin-top:11px;flex-wrap:wrap">
+            <button class="btn grey" id="ciCamBtn" onclick="openCam()" data-i="btnOpenCam">Open camera</button>
+            <button class="btn hide" id="ciSnapBtn" onclick="snap()" data-i="btnSnap">Take photo</button>
+            <button class="btn grey hide" id="ciRetake" onclick="openCam()" data-i="btnRetake">Retake</button>
+          </div>
+        </div>
+        <div class="col"><div id="ciFaceOut" class="sub"></div></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span data-i="stepVoice">Voice note (optional)</span></h3>
+      <p class="sub" data-i="voiceHelp">Say how you are feeling in your own words.</p>
+      <div style="display:flex;gap:9px;margin-top:11px;flex-wrap:wrap">
+        <button class="btn grey" id="ciRecBtn" onclick="toggleCiRec()" data-i="btnRecord">● Record</button>
+        <span class="sub" id="ciRecStatus"></span>
+      </div>
+      <div id="ciVoiceOut" class="sub" style="margin-top:11px"></div>
+    </div>
+
+    <div id="ciError"></div>
+    <button class="btn green" id="ciSubmit" onclick="submitCheckin()" style="width:100%;font-size:19px;padding:18px" data-i="btnFinish">Finish check-in</button>
+    <div id="ciResult" style="margin-top:20px"></div>
+  </section>
+
+  <!-- ================= TALK ================= -->
+  <section class="panel" id="talk">
+    <h2 data-i="talkTitle">Conversation</h2>
+    <p class="sub" data-i="talkSub">Type or speak. Spoken turns are saved so their tone can be analysed later.</p>
+    <div id="talkError"></div>
+
+    <div class="step" style="background:#fbfdff;margin-bottom:14px">
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <button class="btn" id="hfBtn" onclick="toggleHandsFree()" style="font-size:18px;padding:16px 22px">
+          <span data-i="btnHandsFree">🎙 Hands-free conversation</span>
+        </button>
+        <div style="flex:1;min-width:200px">
+          <div class="sub" id="hfStatus" data-i="hfIdle">Talk normally — no buttons. It listens, replies, and listens again.</div>
+          <div class="prog" style="margin:9px 0 0"><i id="hfLevel" style="background:var(--good)"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat" id="chat"></div>
+    <div class="composer">
+      <input type="text" id="chatInput" data-ph="chatPlaceholder" placeholder="Say something…"
+             onkeydown="if(event.key==='Enter')sendText()">
+      <button class="btn" id="sendBtn" onclick="sendText()" data-i="btnSend">Send</button>
+      <button class="btn grey" id="micBtn" onclick="toggleChatRec()">🎤</button>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:14px;flex-wrap:wrap">
+      <button class="ghost" onclick="analyzeVoice()" data-i="btnAnalyzeVoice">Analyse voice tone</button>
+      <button class="ghost" onclick="saveRecord()" data-i="btnSaveRecord">Save conversation record</button>
+    </div>
+    <div id="voiceSummary" class="sub" style="margin-top:12px"></div>
+    <div id="talkRecord" style="margin-top:14px"></div>
+  </section>
+
+  <!-- ================= MEDS ================= -->
+  <section class="panel" id="meds">
+    <h2 data-i="medsTitle">Medicines</h2>
+    <div id="medsAlert"></div>
+    <div class="cards" style="margin:16px 0">
+      <div class="c"><span class="label" data-i="mScheduled">SCHEDULED</span><b id="mTotal">—</b></div>
+      <div class="c"><span class="label" data-i="mTaken">TAKEN</span><b id="mTaken">—</b></div>
+      <div class="c"><span class="label" data-i="mMissed">MISSED</span><b id="mMissed">—</b></div>
+      <div class="c"><span class="label" data-i="mNext">NEXT</span><b id="mNext">—</b></div>
+    </div>
+    <div id="medsList"></div>
+    <div class="step" style="margin-top:20px">
+      <h3 data-i="addRx">Add a prescription</h3>
+      <p class="sub" data-i="rxHelp">Upload a photo of the prescription, or paste the text. You check it before anything is saved.</p>
+      <div style="display:flex;gap:9px;margin:12px 0;flex-wrap:wrap">
+        <input type="file" id="rxFile" accept="image/*" hidden>
+        <button class="ghost" onclick="document.getElementById('rxFile').click()" data-i="btnRxPhoto">Choose a photo</button>
+      </div>
+      <textarea id="rxText" data-ph="rxPlaceholder" placeholder="Amlodipine 5mg — 1 tablet once daily in the morning, 30 days"></textarea>
+      <div style="margin-top:11px">
+        <button class="btn" id="rxBtn" onclick="readRx()" data-i="btnReadRx">Read with AI</button>
+        <span class="sub" id="rxStatus" style="margin-left:10px"></span>
+      </div>
+      <div id="rxReview" style="margin-top:18px"></div>
+    </div>
+  </section>
+
+  <!-- ================= REPORT ================= -->
+  <section class="panel" id="report">
+    <h2 data-i="reportTitle">Handoff report</h2>
+    <p class="sub" data-i="reportSub">Everything from today, written up for the next caregiver.</p>
+    <div style="display:flex;gap:9px;margin:16px 0;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="repBtn" onclick="makeReport()" data-i="btnMakeReport">Generate report</button>
+      <a class="ghost" href="/api/export" data-i="btnExport">Export CSV</a>
+      <span class="sub" id="repStatus"></span>
+    </div>
+    <div id="repOut"></div>
+  </section>
+</main>
+
+<script src="/static/voice.js"></script>
+<script src="/static/webrtc.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

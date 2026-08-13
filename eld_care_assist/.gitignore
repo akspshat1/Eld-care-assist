@@ -1,0 +1,4 @@
+data/*.db
+data/audio/
+__pycache__/
+*.pyc
