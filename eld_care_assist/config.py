@@ -63,6 +63,14 @@ _load_dotenv()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
+# OrcaRouter: used only for report generation from recorded data (daily
+# report, family digest, conversation-to-record extraction). Everything
+# else keeps using Groq directly. If OrcaRouter is unreachable, those
+# call sites fall back to Groq.
+ORCAROUTER_API_KEY = os.environ.get("ORCAROUTER_API_KEY", "")
+ORCAROUTER_BASE_URL = os.environ.get("ORCAROUTER_BASE_URL", "https://api.orcarouter.ai/v1")
+ORCAROUTER_REPORT_MODEL = os.environ.get("ECA_REPORT_MODEL", "orcarouter/auto")
+
 # Conversation, summaries, check-in write-ups.
 TEXT_MODEL = os.environ.get("ECA_TEXT_MODEL", "llama-3.3-70b-versatile")
 # Reading prescription photos.
@@ -117,4 +125,16 @@ def missing_key_message():
         "No Groq API key found. Create a .env file at the repo root "
         f"({ENV_PATH}) containing:\n\n    GROQ_API_KEY=gsk_your_key_here\n\n"
         "Free key: https://console.groq.com/keys"
+    )
+
+
+def orcarouter_ready():
+    return bool(ORCAROUTER_API_KEY and ORCAROUTER_API_KEY.strip())
+
+
+def missing_orcarouter_key_message():
+    return (
+        "No OrcaRouter API key found. Add to the .env file at the repo root "
+        f"({ENV_PATH}):\n\n    ORCAROUTER_API_KEY=your_key_here\n\n"
+        "Get a key: https://orcarouter.ai/register"
     )
