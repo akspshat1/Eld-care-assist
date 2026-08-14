@@ -30,10 +30,17 @@ import engines
 import handsfree
 import family
 import calls
+import alerts
+import memory
+import security
+import voicemode
 import checkin as checkin_mod
 from store import Store
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# How many past turns are resent with each reply.
+MAX_TURNS_REPLAYED = 12
 
 app = FastAPI(title="Elder Care Assistant")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")),
@@ -56,6 +63,24 @@ def _install_demo_clock():
 
 
 _install_demo_clock()
+
+
+def _locked(request):
+    """True when the care-team views should be refused.
+
+    The resident's own screens never call this. Reading the token from a
+    header rather than a cookie keeps it out of anything the browser sends
+    automatically.
+    """
+    if not security.pin_required():
+        return False
+    return not security.valid_session(request.headers.get("X-Care-Token", ""))
+
+
+def _locked_response():
+    return JSONResponse({"ok": False, "locked": True,
+                         "message": "Enter the care team PIN to view this."},
+                        status_code=401)
 
 
 def _err(message, status=400):
@@ -192,7 +217,8 @@ async def api_checkin_voice_start(request: Request):
 
     cid = store.start_conversation(rid)
     handsfree.install_hooks(
-        store, lambda r, l: checkin_mod.interview_prompt(r, l))
+        store, lambda r, l: checkin_mod.interview_prompt(r, l),
+        alert_fn=lambda cid, text: _urgent_alert(cid, text, lang))
 
     try:
         Connection = handsfree.connection_class()
@@ -271,7 +297,18 @@ async def api_checkin_submit(request: Request):
 
     result = checkin_mod.build_result(answers, face, voice, transcript, lang)
     cid = store.add_checkin(resident_id, answers, face, voice, transcript, result)
-    return JSONResponse({"ok": True, "id": cid, **result})
+
+    # The check-in's own red flags reach a person the same way a spoken one
+    # does -- one alert path, whichever way the symptom was reported.
+    alert = None
+    if result.get("urgent"):
+        resident = store.resident(resident_id)
+        if resident:
+            label = (result["concerns"] or ["an urgent symptom"])[0]
+            quote = transcript or label
+            alert = alerts.raise_alert(store, resident, answers.get("urgent", "urgent"),
+                                       label, quote, "checkin", lang)
+    return JSONResponse({"ok": True, "id": cid, "alert": alert, **result})
 
 
 @app.get("/api/checkin/history")
@@ -313,35 +350,66 @@ def _system_prompt(resident, lang):
                "答えやすい一言の質問で始めてください。\n" if lang == "ja"
                else "If you are speaking first, open with a short warm greeting "
                     "and one easy question. One or two sentences.\n")
-    return base + opening + (("日本語で返答してください。\n" + length_ja)
-                             if lang == "ja"
-                             else ("Reply in English.\n" + length_en))
+    prompt = base + opening + (("日本語で返答してください。\n" + length_ja)
+                               if lang == "ja"
+                               else ("Reply in English.\n" + length_en))
+
+    # What happened over the last few days, so the companion picks up where it
+    # left off instead of meeting them afresh every time.
+    recalled = memory.build(store, resident["id"], lang)
+    if recalled:
+        prompt += "\n\n" + recalled
+    return prompt
 
 
 def _reply(conversation_id, content, lang, audio_bytes=None):
     conv = store.conversation(conversation_id)
     if conv is None:
-        return None, "Conversation not found."
+        return None, "Conversation not found.", None
     resident = store.resident(conv["resident_id"])
     if resident is None:
-        return None, "Resident not found."
+        return None, "Resident not found.", None
 
     msg_id = store.add_message(conversation_id, "user", content)
     if audio_bytes:
         # Keep the recording so voice emotion can be run over it later.
         store.save_audio(conversation_id, msg_id, audio_bytes)
 
-    msgs = [{"role": "system", "content": _system_prompt(resident, lang)}]
-    for m in store.messages(conversation_id):
+    # An urgent symptom mentioned in passing is the whole point of listening.
+    # Raise it before the reply is generated, so help is on its way even if
+    # the language model call then fails.
+    urgent = alerts.detect_urgent(content, lang)
+    alert = None
+    if urgent:
+        alert = alerts.raise_alert(store, resident, urgent["kind"],
+                                   urgent["label"], urgent["quote"],
+                                   "conversation", lang,
+                                   urgent.get("severity", "urgent"))
+
+    system = _system_prompt(resident, lang)
+    if urgent:
+        # Tell the companion what just happened so it responds like a person
+        # would, instead of carrying on about the weather.
+        system += ("\n\nIMPORTANT: they have just mentioned "
+                   f"{urgent['label']}. Respond warmly and calmly, take it "
+                   "seriously, tell them you are letting a caregiver know "
+                   "right now, and ask them to stay where they are. Do not "
+                   "diagnose and do not give medical advice. Keep it to two "
+                   "short sentences.")
+
+    msgs = [{"role": "system", "content": system}]
+    # Only the recent turns: a long chat would otherwise resend itself in full
+    # on every reply, and older detail is already covered by memory.
+    for m in store.messages(conversation_id)[-MAX_TURNS_REPLAYED:]:
         msgs.append({"role": m["role"], "content": m["content"]})
 
     try:
         reply = groq_api.chat(msgs, temperature=0.7, max_tokens=300)
     except groq_api.GroqError as e:
-        return None, str(e)
+        return None, str(e), alert
 
     store.add_message(conversation_id, "assistant", reply)
-    return reply, None
+    return reply, None, alert
 
 
 @app.post("/api/conversation/start")
@@ -356,6 +424,25 @@ async def api_conv_start(request: Request):
 @app.get("/api/conversation/{cid}/messages")
 def api_conv_messages(cid: int):
     return JSONResponse({"messages": store.messages(cid)})
+
+
+def _urgent_alert(cid, said, lang):
+    """Detect an urgent symptom in a spoken turn and raise the alert.
+
+    Used by the hands-free paths, which do not go through _reply().
+    """
+    urgent = alerts.detect_urgent(said, lang)
+    if not urgent:
+        return None
+    conv = store.conversation(cid)
+    if conv is None:
+        return None
+    resident = store.resident(conv["resident_id"])
+    if resident is None:
+        return None
+    return alerts.raise_alert(store, resident, urgent["kind"], urgent["label"],
+                              urgent["quote"], "conversation", lang,
+                              urgent.get("severity", "urgent"))
 
 
 def _call_offer(cid, said, lang):
@@ -383,11 +470,12 @@ async def api_conv_say(cid: int, request: Request):
     if not content:
         return _err("Nothing to send.")
     lang = body.get("lang", "en")
-    reply, err = _reply(cid, content, lang)
+    reply, err, alert = _reply(cid, content, lang)
     if err:
         return _err(err)
     return JSONResponse({"ok": True, "reply": reply,
-                         "call": _call_offer(cid, content, lang)})
+                         "call": _call_offer(cid, content, lang),
+                         "alert": alert})
 
 
 @app.post("/api/calls/{contact_id}/log")
@@ -415,12 +503,13 @@ async def api_conv_say_audio(cid: int, request: Request, lang: str = "en"):
         return _err(str(e))
     if not text:
         return _err("Nothing was heard in that recording.")
-    reply, err = _reply(cid, text, lang, audio_bytes=bytes(raw))
+    reply, err, alert = _reply(cid, text, lang, audio_bytes=bytes(raw))
     if err:
         return _err(err)
     return JSONResponse({"ok": True, "transcript": text, "reply": reply,
                          "audio_saved": True,
-                         "call": _call_offer(cid, text, lang)})
+                         "call": _call_offer(cid, text, lang),
+                         "alert": alert})
 
 
 @app.post("/api/conversation/{cid}/voice/offer")
@@ -448,7 +537,8 @@ async def api_voice_offer(cid: int, request: Request):
 
     handsfree.install_hooks(
         store, _system_prompt,
-        call_offer_fn=lambda cid, text: _call_offer(cid, text, lang))
+        call_offer_fn=lambda cid, text: _call_offer(cid, text, lang),
+        alert_fn=lambda cid, text: _urgent_alert(cid, text, lang))
 
     try:
         Connection = handsfree.connection_class()
@@ -495,7 +585,10 @@ def api_conv_analyze_voice(cid: int, all_turns: bool = False):
             failed += 1
             continue
         try:
-            wav = vm.load_audio(path)
+            # Recordings are encrypted on disk; decrypt in memory only.
+            with open(path, "rb") as fh:
+                raw_audio = security.decrypt_bytes(fh.read())
+            wav = vm.load_audio(raw_audio)
             o = engine.analyze(wav)["overall"]
             store.set_message_voice(m["id"], o["en"], o["confidence"], o["valence"])
             done += 1
@@ -699,7 +792,9 @@ Under any heading with nothing to report, write "Nothing particular"."""
 
 
 @app.get("/api/report")
-def api_report(day: str = "", resident_id: int | None = None, lang: str = "en"):
+def api_report(request: Request, day: str = "", resident_id: int | None = None, lang: str = "en"):
+    if _locked(request):
+        return _locked_response()
     day = day or date.today().isoformat()
     checkins = store.checkins(day, resident_id)
     records = store.conv_records(day)
@@ -742,7 +837,9 @@ def api_report(day: str = "", resident_id: int | None = None, lang: str = "en"):
 # --------------------------------------------------------------- family ---
 
 @app.get("/api/family/overview")
-def api_family_overview(resident_id: int, days: int = 14):
+def api_family_overview(request: Request, resident_id: int, days: int = 14):
+    if _locked(request):
+        return _locked_response()
     try:
         data = family.overview(store, engines.get_med_store, resident_id, days)
     except Exception as e:                    # noqa: BLE001
@@ -753,7 +850,9 @@ def api_family_overview(resident_id: int, days: int = 14):
 
 
 @app.get("/api/family/timeline")
-def api_family_timeline(resident_id: int, days: int = 14):
+def api_family_timeline(request: Request, resident_id: int, days: int = 14):
+    if _locked(request):
+        return _locked_response()
     try:
         return JSONResponse({"ok": True, "days": family.timeline(
             store, engines.get_med_store, resident_id, days)})
@@ -807,6 +906,220 @@ def api_delete_contact(contact_id: int):
     return JSONResponse({"ok": True})
 
 
+@app.post("/api/voice/say")
+async def api_voice_say(request: Request, resident_id: int = 0,
+                        lang: str = "en", awake: int = 0,
+                        conversation_id: int = 0):
+    """One utterance heard by always-on voice mode.
+
+    Handles both states in one place so the browser only has to record and
+    play: while asleep it listens for the wake word and for a cry for help;
+    once awake it answers, and routes spoken commands to the same code the
+    screens use.
+    """
+    raw = await request.body()
+    if not raw or not resident_id:
+        return _err("Nothing heard.")
+    resident = store.resident(resident_id)
+    if resident is None:
+        return _err("Unknown resident.")
+
+    try:
+        heard = groq_api.transcribe(bytes(raw), "voice.wav", lang)
+    except groq_api.GroqError as e:
+        return JSONResponse({"ok": False, "message": str(e), "awake": bool(awake)})
+
+    heard = (heard or "").strip()
+    out = {"ok": True, "heard": heard, "awake": bool(awake), "alert": None,
+           "say": "", "action": None, "conversation_id": conversation_id}
+    if not heard:
+        return JSONResponse(out)
+
+    # An emergency is handled in either state, before anything else.
+    urgent = alerts.detect_urgent(heard, lang)
+    if urgent:
+        out["alert"] = alerts.raise_alert(
+            store, resident, urgent["kind"], urgent["label"], urgent["quote"],
+            "guardian" if not awake else "conversation", lang,
+            urgent.get("severity", "urgent"))
+        store.audit("voice_alert", f"{urgent['label']}: {heard[:80]}")
+        out["awake"] = True
+        out["say"] = ("すぐに介護者にお伝えしました。そのままお待ちください。"
+                      if lang == "ja" else
+                      "I've told a caregiver right away. Please stay where you are.")
+        return JSONResponse(out)
+
+    # Asleep: only the wake word does anything.
+    if not awake:
+        if not voicemode.is_wake(heard):
+            return JSONResponse(out)          # heard, checked, discarded
+        out["awake"] = True
+        remainder = voicemode.strip_wake(heard)
+        if not remainder:
+            out["say"] = voicemode.greeting(resident["name"].split()[0], lang)
+            return JSONResponse(out)
+        heard = remainder                     # "Hello Robo, call my son"
+
+    if voicemode.is_sleep(heard):
+        out["awake"] = False
+        out["say"] = voicemode.going_to_sleep(lang)
+        return JSONResponse(out)
+
+    intent = voicemode.classify(heard)
+    out["intent"] = intent
+
+    if intent == "call":
+        contact = calls.detect(heard, store.contacts(resident_id))
+        if contact:
+            out["action"] = {"type": "call", "contact_id": contact["id"],
+                             "name": contact["name"],
+                             "phone": contact["phone"],
+                             "tel": calls.tel_link(contact["phone"])}
+            out["say"] = calls.offer_text(contact, lang)
+            return JSONResponse(out)
+
+    if intent in ("medicine_query", "medicine_taken"):
+        ms = engines.get_med_store()
+        summary = ms.day_summary(date.today().isoformat())
+        summary["due"] = ms.due_now()
+        summary["next"] = ms.next_dose()
+        if intent == "medicine_taken" and summary["due"]:
+            d = summary["due"][0]
+            ms.mark(d["med_id"], d["day"], d["slot"], "taken")
+            out["say"] = voicemode.confirm_taken(d["name"], lang)
+            out["action"] = {"type": "medicine_taken", "name": d["name"]}
+        else:
+            out["say"] = voicemode.say_medicines(summary, lang)
+            out["action"] = {"type": "medicine_info"}
+        return JSONResponse(out)
+
+    if intent == "checkin":
+        out["action"] = {"type": "start_checkin"}
+        out["say"] = ("体調をお伺いします。昨夜はよく眠れましたか？" if lang == "ja"
+                      else "Let's do your check-in. How did you sleep last night?")
+        return JSONResponse(out)
+
+    if intent == "status":
+        latest = store.latest_checkin(resident_id)
+        if latest and latest.get("summary"):
+            out["say"] = latest["summary"]
+        else:
+            out["say"] = ("まだ今日の記録がありません。" if lang == "ja"
+                          else "I don't have a check-in for you yet today.")
+        return JSONResponse(out)
+
+    # Ordinary conversation, with the same companion prompt the screens use.
+    cid = conversation_id or store.start_conversation(resident_id)
+    out["conversation_id"] = cid
+    reply, err, _alert = _reply(cid, heard, lang)
+    out["say"] = reply or (err or "")
+    return JSONResponse(out)
+
+
+@app.post("/api/guardian/listen")
+async def api_guardian_listen(request: Request, resident_id: int = 0,
+                              lang: str = "en"):
+    """One overheard utterance from the room.
+
+    Guardian mode is the case nobody plans for: someone on the floor who
+    cannot reach a button. The browser sends only speech (its VAD gates
+    silence), this transcribes it, and *only* an urgent phrase raises an alert.
+
+    Nothing is written to disk. Ordinary conversation is transcribed in memory,
+    checked, and dropped -- a room monitor that quietly recorded everything
+    would be indefensible in someone's home.
+    """
+    raw = await request.body()
+    if not raw or not resident_id:
+        return _err("Nothing to check.")
+
+    try:
+        text = groq_api.transcribe(bytes(raw), "room.wav", lang)
+    except groq_api.GroqError as e:
+        # Never surface a rate limit as a false all-clear.
+        return JSONResponse({"ok": False, "heard": "", "message": str(e)})
+
+    said = (text or "").strip()
+    if not said:
+        return JSONResponse({"ok": True, "heard": "", "alert": None})
+
+    urgent = alerts.detect_urgent(said, lang)
+    if not urgent:
+        # Heard, checked, discarded.
+        return JSONResponse({"ok": True, "heard": said, "alert": None})
+
+    resident = store.resident(resident_id)
+    if resident is None:
+        return _err("Unknown resident.")
+    alert = alerts.raise_alert(store, resident, urgent["kind"], urgent["label"],
+                               urgent["quote"], "guardian", lang,
+                               urgent.get("severity", "urgent"))
+    store.audit("guardian_alert", f"{urgent['label']}: {said[:80]}")
+    return JSONResponse({"ok": True, "heard": said, "alert": alert})
+
+
+@app.get("/api/security")
+def api_security():
+    return JSONResponse({"ok": True, **security.status()})
+
+
+@app.post("/api/security/unlock")
+async def api_unlock(request: Request):
+    body = await request.json()
+    if not security.pin_required():
+        return JSONResponse({"ok": True, "token": "", "pin_required": False})
+    if not security.check_pin(body.get("pin", "")):
+        store.audit("unlock_failed", "wrong PIN")
+        return _err("That PIN is not right.", 401)
+    token = security.new_session()
+    store.audit("unlock", "care view unlocked")
+    return JSONResponse({"ok": True, "token": token, "pin_required": True})
+
+
+@app.post("/api/security/lock")
+async def api_lock(request: Request):
+    security.end_session(request.headers.get("X-Care-Token", ""))
+    store.audit("lock", "care view locked")
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/security/audit")
+def api_audit(request: Request, limit: int = 40):
+    if _locked(request):
+        return _locked_response()
+    return JSONResponse({"ok": True, "entries": store.audit_log(limit)})
+
+
+@app.get("/api/alerts")
+def api_alerts(resident_id: int | None = None, limit: int = 20):
+    return JSONResponse({"ok": True,
+                         "alerts": store.alerts(resident_id, limit),
+                         "channels": alerts.channels_configured()})
+
+
+@app.post("/api/alerts/{alert_id}/ack")
+def api_ack_alert(alert_id: int):
+    store.acknowledge_alert(alert_id)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/alerts/test")
+async def api_test_alert(request: Request):
+    """Send a test alert, to prove the delivery path works before it matters."""
+    body = await request.json()
+    resident = store.resident(body.get("resident_id"))
+    if resident is None:
+        return _err("Pick a resident first.")
+    lang = body.get("lang", "en")
+    alert = alerts.raise_alert(
+        store, resident, "test",
+        "a test alert" if lang != "ja" else "テスト通知",
+        "This is a test of the alert system." if lang != "ja"
+        else "これは通知テストです。",
+        "checkin", lang)
+    return JSONResponse({"ok": True, "alert": alert})
+
+
 @app.get("/api/demo/clock")
 def api_demo_clock_get():
     return JSONResponse({"ok": True, **democlock.state()})
@@ -832,7 +1145,10 @@ async def api_demo_clock_set(request: Request):
 
 
 @app.get("/api/export")
-def api_export(days: int = 30):
+def api_export(request: Request, days: int = 30):
+    if _locked(request):
+        return _locked_response()
+    store.audit("export", f"CSV export, {days} days")
     rows = [["day", "time", "resident", "wellbeing", "summary", "concerns"]]
     residents = {r["id"]: r["name"] for r in store.residents()}
     for c in store.checkins(limit=500):

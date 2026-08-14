@@ -105,6 +105,36 @@ const T = {
   medRemindersOn:"Voice reminders on", medRemindersOff:"Voice reminders off",
   dcReal:"Real time", dcDemo:"Demo time", dcClock:"Clock",
   dcHint:"Type 8:05, 0805 or 8", dcBadTime:"Use a time like 8:05",
+  fcEmail:"Email (for alerts)",
+  alertsTitle:"Urgent alerts", btnTestAlert:"Send a test alert",
+  alertRaised:"Alert sent to family", alertNoChannels:"Recorded, but nothing is configured to send it",
+  alertSending:"Sending\u2026", alertNone:"No urgent alerts. Good.",
+  alertAck:"Acknowledge", alertAcked:"Acknowledged",
+  alertTo:(n)=>`to ${n}`, alertChannelsOn:(l)=>`Delivering by: ${l}`,
+  alertChannelsOff:"No delivery configured \u2014 alerts are recorded only",
+  alertUrgentTitle:"Urgent: a caregiver has been alerted",
+  lockTitle:"Care team view", lockSub:"Enter the PIN to see health records.",
+  lockUnlock:"Unlock", lockCancel:"Back", lockWrong:"That PIN is not right.",
+  lockHint:"The resident's own screens are never locked.",
+  lockedMsg:"Locked \u2014 enter the care team PIN.",
+  guardTitle:"Guardian mode",
+  guardOff:"Off. Nobody is listening to this room.",
+  guardOn:"Listening for calls for help. Nothing is recorded.",
+  guardStart:"Start listening", guardStop:"Stop listening",
+  guardHeardNothing:"", guardChecked:(n)=>`${n} sound(s) checked and discarded`,
+  guardRaised:"Heard a call for help \u2014 family alerted",
+  guardDenied:"Microphone unavailable, so nothing can be heard.",
+  modeVoice:"Voice", tabVoice:"Voice",
+  vmOff:"Voice mode is off", vmOffHint:"Press start, then just say \u201cHello Robo\u201d.",
+  vmSleeping:"Sleeping", vmSleepHint:"Say \u201cHello Robo\u201d to wake me.",
+  vmAwake:"Listening", vmAwakeHint:"I\u2019m here \u2014 what do you need?",
+  vmThinking:"One moment\u2026", vmSpeaking:"Speaking\u2026",
+  vmStart:"Start voice mode", vmStop:"Stop voice mode",
+  vmPrivacy:"While asleep it only listens for \u201cHello Robo\u201d and for a call for help. Nothing is recorded; what it hears is checked and discarded.",
+  vmYouSaid:"You said", vmDenied:"Microphone unavailable.",
+  trendNone:"No check-ins yet \u2014 the trend appears after the first one.",
+  trendOne:"One check-in so far. The trend line needs a second day.",
+  trendOver:(n)=>`over ${n} days`,
   micDenied:"Microphone unavailable. Check the browser's permission.",
   camDenied:"Camera unavailable. Check the browser's permission."
  },
@@ -207,6 +237,36 @@ const T = {
   medRemindersOn:"音声でお知らせ：オン", medRemindersOff:"音声でお知らせ：オフ",
   dcReal:"実時間", dcDemo:"デモ時間", dcClock:"時刻",
   dcHint:"8:05 / 0805 / 8 のように入力", dcBadTime:"8:05 のように入力してください",
+  fcEmail:"メール（通知用）",
+  alertsTitle:"緊急通知", btnTestAlert:"テスト通知を送信",
+  alertRaised:"ご家族に通知しました", alertNoChannels:"記録しましたが、送信先が未設定です",
+  alertSending:"送信中…", alertNone:"緊急通知はありません。",
+  alertAck:"確認した", alertAcked:"確認済み",
+  alertTo:(n)=>`宛先：${n}`, alertChannelsOn:(l)=>`送信方法：${l}`,
+  alertChannelsOff:"送信先が未設定です（記録のみ）",
+  alertUrgentTitle:"緊急：介護者に連絡しました",
+  lockTitle:"ケアチーム画面", lockSub:"健康記録を見るにはPINを入力してください。",
+  lockUnlock:"解除", lockCancel:"戻る", lockWrong:"PINが違います。",
+  lockHint:"ご本人の画面はロックされません。",
+  lockedMsg:"ロック中 — PINを入力してください。",
+  guardTitle:"見守りモード",
+  guardOff:"オフ。この部屋は監視されていません。",
+  guardOn:"助けを求める声を待機中。録音はされません。",
+  guardStart:"見守りを開始", guardStop:"見守りを停止",
+  guardHeardNothing:"", guardChecked:(n)=>`${n}件の音を確認し、破棄しました`,
+  guardRaised:"助けを求める声 — ご家族に通知しました",
+  guardDenied:"マイクが使えないため、聞くことができません。",
+  modeVoice:"音声", tabVoice:"音声",
+  vmOff:"音声モードはオフです", vmOffHint:"開始を押して「ハローロボ」とお話しください。",
+  vmSleeping:"待機中", vmSleepHint:"「ハローロボ」と呼んでください。",
+  vmAwake:"お聴きしています", vmAwakeHint:"どうされましたか？",
+  vmThinking:"少々お待ちください…", vmSpeaking:"お話ししています…",
+  vmStart:"音声モードを開始", vmStop:"音声モードを停止",
+  vmPrivacy:"待機中は「ハローロボ」と助けを求める声だけを聞いています。録音はされず、確認後に破棄されます。",
+  vmYouSaid:"お話しの内容", vmDenied:"マイクが使えません。",
+  trendNone:"まだ記録がありません。最初のチェック後に表示されます。",
+  trendOne:"記録は1件です。2日目から推移を表示します。",
+  trendOver:(n)=>`直近${n}日`,
   micDenied:"マイクを使用できません。ブラウザの許可をご確認ください。",
   camDenied:"カメラを使用できません。ブラウザの許可をご確認ください。"
  }
@@ -261,12 +321,18 @@ function setMode(m) {
   localStorage.setItem("eca_mode", m);
   document.body.dataset.mode = m;
   $("modeResident").classList.toggle("on", m === "resident");
+  $("modeVoice").classList.toggle("on", m === "voice");
   $("modeCare").classList.toggle("on", m === "care");
+  // Never leave a microphone running in a mode the user has left.
+  if (m !== "voice" && vmLoop) toggleVoiceMode();
   applyTabVisibility();
+
+  // Health records sit behind a PIN; the resident's own view never does.
+  if (m === "care") ensureUnlocked();
 
   // Always land on this mode's home. Switching mode is a deliberate change of
   // context, so carrying the previous tab over is more confusing than helpful.
-  go(m === "resident" ? "residentHome" : "home");
+  go(m === "resident" ? "residentHome" : m === "voice" ? "voicehome" : "home");
 }
 
 function applyTabVisibility() {
@@ -387,17 +453,66 @@ async function loadHome() {
 const scoreColor = s => s == null ? "" : (s >= 60 ? "var(--good)" : s < 40 ? "var(--warn)" : "var(--amber)");
 
 function sparkline(trend) {
-  const w = 260, h = 60, max = 100;
-  const step = trend.length > 1 ? w / (trend.length - 1) : w;
-  const pts = trend.map((d, i) => `${i * step},${h - (d.score / max) * h}`).join(" ");
-  return `<div class="sub" style="margin-bottom:6px">Last ${trend.length} days</div>
-    <svg width="${w}" height="${h}" style="overflow:visible">
-      <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round"/>
-      ${trend.map((d, i) => `<circle cx="${i * step}" cy="${h - (d.score / max) * h}" r="3.5"
-                fill="${d.score >= 60 ? "#16a34a" : d.score < 40 ? "#dc2626" : "#d97706"}"/>`).join("")}
-    </svg>`;
+  // Below two points there is no trend to draw; say so rather than showing
+  // a couple of dots floating in white space.
+  if (!trend || trend.length === 0) {
+    return `<div class="empty"><span class="big">\u{1F4C8}</span>
+            ${esc(t("trendNone"))}</div>`;
+  }
+  if (trend.length === 1) {
+    const only = trend[0];
+    return `<div class="trend"><div class="cap">
+        <div class="now" style="color:${scoreColor(only.score)}">${only.score}<span
+          style="font-size:.9rem;color:var(--ink-3);font-weight:600">/100</span></div>
+      </div><div class="muted">${esc(t("trendOne"))}</div></div>`;
+  }
+
+  const W = 300, H = 96, pad = 6;
+  const n = trend.length;
+  const x = i => pad + (i * (W - pad * 2)) / (n - 1);
+  const y = v => H - pad - ((Math.max(0, Math.min(100, v)) / 100) * (H - pad * 2));
+
+  const pts = trend.map((d, i) => [x(i), y(d.score)]);
+  const line = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const area = `${pad},${H - pad} ${line} ${W - pad},${H - pad}`;
+
+  const first = trend[0].score, last = trend[n - 1].score;
+  const diff = last - first;
+  const arrow = diff > 2 ? "\u2197" : diff < -2 ? "\u2198" : "\u2192";
+  const dcol = diff > 2 ? "var(--good)" : diff < -2 ? "var(--bad)" : "var(--ink-3)";
+
+  return `<div class="trend">
+    <div class="cap">
+      <div class="now" style="color:${scoreColor(last)}">${last}<span
+        style="font-size:.9rem;color:var(--ink-3);font-weight:600">/100</span></div>
+      <div class="delta" style="color:${dcol}">${arrow} ${diff > 0 ? "+" : ""}${diff}
+        <span style="color:var(--ink-3);font-weight:500">${esc(t("trendOver")(n))}</span></div>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+      <defs>
+        <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${scoreColor(last)}" stop-opacity=".22"/>
+          <stop offset="100%" stop-color="${scoreColor(last)}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${pad}" y1="${y(60)}" x2="${W - pad}" y2="${y(60)}"
+            stroke="var(--line)" stroke-dasharray="3 4"/>
+      <line x1="${pad}" y1="${y(40)}" x2="${W - pad}" y2="${y(40)}"
+            stroke="var(--line)" stroke-dasharray="3 4"/>
+      <text class="axis" x="${W - pad}" y="${y(60) - 3}" text-anchor="end">60</text>
+      <text class="axis" x="${W - pad}" y="${y(40) - 3}" text-anchor="end">40</text>
+      <polygon points="${area}" fill="url(#tg)"/>
+      <polyline points="${line}" fill="none" stroke="${scoreColor(last)}"
+                stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${pts.map((pt, i) => `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}"
+          r="${i === n - 1 ? 4.5 : 3}" fill="#fff"
+          stroke="${scoreColor(trend[i].score)}" stroke-width="2.5"/>`).join("")}
+    </svg>
+    <div class="days"><span>${esc(trend[0].day.slice(5))}</span>
+      <span>${esc(trend[n - 1].day.slice(5))}</span></div>
+  </div>`;
 }
+
 
 /* ================= CHECK-IN ================= */
 async function loadQuestions() {
@@ -564,6 +679,7 @@ async function submitCheckin() {
     })).json();
     if (!j.ok) { $("ciError").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
     showCheckinResult(j);
+    showUrgent(j.alert);
     state.answers = {}; state.face = null; state.voice = null; state.transcript = "";
     renderQuestions();
     $("ciFaceOut").innerHTML = ""; $("ciVoiceOut").innerHTML = "";
@@ -637,6 +753,7 @@ async function startCheckinCall() {
     try {
       const m = JSON.parse(ev.data);
       if (!m || (m.role !== "user" && m.role !== "assistant")) return;
+      if (m.type === "alert") { showUrgent(m); return; }
       if (typeof m.text !== "string" || !m.text.trim()) return;
       addCheckinLine(m.role, m.text);
       if (m.role === "assistant") say(m.text, lang);
@@ -776,6 +893,7 @@ async function toggleChatRec() {
       addBubble("assistant", j.reply);
       speak(j.reply);
       showCallOffer(j.call);
+      showUrgent(j.alert);
     } catch (e) { $("talkError").innerHTML = `<div class="note bad">${esc(String(e))}</div>`; }
   } else {
     try {
@@ -815,6 +933,8 @@ async function toggleHandsFree() {
       onUserSpeaking: shutUp,
       // They asked out loud to phone someone; the backend spotted who.
       onCall: (c) => showCallOffer(c),
+      // They said something urgent; a caregiver has already been told.
+      onAlert: (a) => showUrgent(a),
       onLevel: (v) => { $("hfLevel").style.width = `${Math.round(v * 100)}%`; },
     });
     btn.className = "btn red";
@@ -1002,6 +1122,385 @@ async function loadMoodHistory() {
 }
 
 
+
+
+
+
+/* ================= ALWAYS-ON VOICE MODE =================
+   For a resident who will not use a screen at all. It sleeps until the wake
+   word, does what is asked, then goes back to sleep on its own.
+
+   Asleep it is Guardian mode: everything is transcribed, checked for the wake
+   word and for a cry for help, and dropped. Awake it can reach every feature
+   -- medicines, the check-in, phoning family, emergencies. */
+
+let vmLoop = null;
+let vmAwake = false;
+let vmBusy = false;
+let vmConvId = 0;
+let vmSleepTimer = null;
+
+const VM_SLEEP_AFTER_MS = 45000;    // silence before it stands down
+
+function vmSetState(state, hint, cls) {
+  $("voiceState").textContent = state;
+  $("voiceHint").textContent = hint;
+  const stage = $("voiceStage");
+  stage.classList.toggle("awake", cls === "awake");
+  stage.classList.toggle("alarm", cls === "alarm");
+}
+
+function vmSleep(spokenGoodbye) {
+  vmAwake = false;
+  vmConvId = 0;
+  clearTimeout(vmSleepTimer);
+  if (vmLoop) vmSetState(t("vmSleeping"), t("vmSleepHint"), "");
+  if (spokenGoodbye) say(spokenGoodbye, lang);
+}
+
+function vmTouch() {
+  // Any exchange resets the countdown back to sleep.
+  clearTimeout(vmSleepTimer);
+  vmSleepTimer = setTimeout(() => vmSleep(null), VM_SLEEP_AFTER_MS);
+}
+
+async function toggleVoiceMode() {
+  if (vmLoop) {
+    vmLoop.stop(); vmLoop = null; shutUp();
+    clearTimeout(vmSleepTimer);
+    vmAwake = false;
+    $("voiceBtn").className = "btn lg"; $("voiceBtn").textContent = t("vmStart");
+    vmSetState(t("vmOff"), t("vmOffHint"), "");
+    $("voiceHeard").innerHTML = "";
+    return;
+  }
+
+  const btn = $("voiceBtn");
+  btn.disabled = true;
+  try {
+    vmLoop = new VoiceLoop({
+      onTurn: (blob) => vmHeard(blob),
+      onSpeechStart: () => { if (vmAwake) shutUp(); },   // barge-in
+      onLevel: () => {},
+    });
+    await vmLoop.start();
+  } catch (e) {
+    vmLoop = null; btn.disabled = false;
+    vmSetState(t("vmOff"), t("vmDenied"), "");
+    return;
+  }
+  btn.disabled = false;
+  btn.className = "btn lg bad";
+  btn.textContent = t("vmStop");
+  vmSleep(null);
+}
+
+async function vmHeard(blob) {
+  if (!blob || vmBusy || !vmLoop) return;
+  vmBusy = true;
+  const wasAwake = vmAwake;
+  if (wasAwake) vmSetState(t("vmThinking"), "", "awake");
+  try {
+    const url = `/api/voice/say?resident_id=${state.residentId}&lang=${lang}`
+              + `&awake=${vmAwake ? 1 : 0}&conversation_id=${vmConvId}`;
+    const j = await (await fetch(url, { method: "POST", body: blob })).json();
+
+    if (!j.ok) {
+      if (wasAwake) vmSetState(t("vmAwake"), j.message || "", "awake");
+      return;
+    }
+    if (j.conversation_id) vmConvId = j.conversation_id;
+
+    // Emergency: shown, spoken, and the family already notified server-side.
+    if (j.alert) {
+      vmAwake = true;
+      showUrgent(j.alert);
+      vmSetState(t("alertUrgentTitle"), j.alert.label, "alarm");
+      $("voiceHeard").innerHTML =
+        `<div class="you">${esc(t("vmYouSaid"))}</div>
+         <div class="said">"${esc(j.heard)}"</div>`;
+      await say(j.say, lang);
+      vmTouch();
+      return;
+    }
+
+    // Still asleep: it heard something that was not the wake word.
+    if (!j.awake && !vmAwake) return;
+
+    if (j.awake && !vmAwake) {
+      vmAwake = true;                       // woken by the wake word
+      vmSetState(t("vmAwake"), t("vmAwakeHint"), "awake");
+    }
+
+    if (j.heard) {
+      $("voiceHeard").innerHTML =
+        `<div class="you">${esc(t("vmYouSaid"))}</div>
+         <div class="said">"${esc(j.heard)}"</div>`;
+    }
+
+    // Spoken commands reach the same features the screens use.
+    if (j.action) {
+      if (j.action.type === "call") showCallOffer(j.action);
+      if (j.action.type === "start_checkin") { setMode("resident"); go("checkin"); }
+      if (j.action.type === "medicine_taken" || j.action.type === "medicine_info") {
+        if (currentTab() === "meds") loadMeds();
+      }
+    }
+
+    if (j.say) {
+      vmSetState(t("vmSpeaking"), "", "awake");
+      await say(j.say, lang);
+    }
+
+    if (j.awake === false) { vmSleep(null); return; }
+    vmSetState(t("vmAwake"), t("vmAwakeHint"), "awake");
+    vmTouch();
+  } catch (e) {
+    /* keep listening through a network hiccup */
+  } finally {
+    vmBusy = false;
+  }
+}
+
+window.addEventListener("beforeunload", () => { if (vmLoop) vmLoop.stop(); });
+
+/* ================= GUARDIAN MODE =================
+   The failure nobody plans for is someone on the floor who cannot reach a
+   button. This listens to the room, and only a call for help does anything.
+
+   Three rules it holds to:
+     - it looks unmistakably "on" while listening;
+     - only speech is sent (the VAD gates silence), never a continuous stream;
+     - what is heard is checked and discarded unless it is urgent. */
+
+let guardLoop = null;
+let guardChecked = 0;
+let guardBusy = false;
+let guardLastSent = 0;
+
+// Whisper is rate limited and this could otherwise fire on every cough.
+const GUARD_MIN_GAP_MS = 5000;
+
+async function toggleGuardian() {
+  if (guardLoop) { stopGuardian(); return; }
+
+  const btn = $("guardBtn");
+  btn.disabled = true;
+  try {
+    guardLoop = new VoiceLoop({
+      onTurn: (blob) => guardianHeard(blob),
+      onLevel: () => {},
+      onSpeechStart: () => {},
+    });
+    await guardLoop.start();
+  } catch (e) {
+    guardLoop = null;
+    btn.disabled = false;
+    $("guardStatus").textContent = t("guardDenied");
+    return;
+  }
+  guardChecked = 0;
+  btn.disabled = false;
+  btn.className = "btn bad";
+  btn.textContent = t("guardStop");
+  $("guardianBox").classList.add("on");
+  $("guardStatus").innerHTML = `<span class="livedot"></span>${esc(t("guardOn"))}`;
+  $("guardHeard").textContent = "";
+}
+
+function stopGuardian() {
+  if (guardLoop) { guardLoop.stop(); guardLoop = null; }
+  const btn = $("guardBtn");
+  btn.className = "btn";
+  btn.textContent = t("guardStart");
+  $("guardianBox").classList.remove("on");
+  $("guardStatus").textContent = t("guardOff");
+  $("guardHeard").textContent = "";
+}
+
+async function guardianHeard(blob) {
+  // One in flight at a time, and never faster than the gap: a busy room must
+  // not turn into a burst of API calls.
+  if (!blob || guardBusy) return;
+  if (Date.now() - guardLastSent < GUARD_MIN_GAP_MS) return;
+  guardBusy = true;
+  guardLastSent = Date.now();
+  try {
+    const j = await (await fetch(
+      `/api/guardian/listen?resident_id=${state.residentId}&lang=${lang}`,
+      { method: "POST", body: blob })).json();
+
+    if (!j.ok) { $("guardHeard").textContent = j.message || ""; return; }
+
+    guardChecked++;
+    if (j.alert) {
+      showUrgent(j.alert);
+      $("guardHeard").innerHTML =
+        `<b style="color:var(--bad)">${esc(t("guardRaised"))}</b>`;
+      // Say it aloud so the resident knows help is coming.
+      say(t("alertUrgentTitle"), lang);
+    } else {
+      // Shown briefly for transparency, then gone -- nothing is kept.
+      $("guardHeard").textContent = t("guardChecked")(guardChecked);
+    }
+  } catch (e) {
+    /* network hiccup: keep listening */
+  } finally {
+    guardBusy = false;
+  }
+}
+
+// Never leave a microphone open on a page the user has left.
+window.addEventListener("beforeunload", () => { if (guardLoop) guardLoop.stop(); });
+
+/* ================= CARE TEAM LOCK =================
+   The resident's own screens are never gated. The care, family, medicine and
+   report views hold health records, phone numbers and the resident's own
+   words, so they sit behind a PIN when one is configured. */
+
+// sessionStorage, not localStorage: the unlock dies with the browser session.
+let careToken = sessionStorage.getItem("eca_care_token") || "";
+let pinRequired = false;
+
+/** fetch() that carries the care token and reports a lock instead of failing. */
+async function careFetch(url, opts = {}) {
+  const headers = Object.assign({}, opts.headers || {});
+  if (careToken) headers["X-Care-Token"] = careToken;
+  const res = await fetch(url, Object.assign({}, opts, { headers }));
+  if (res.status === 401) {
+    careToken = "";
+    sessionStorage.removeItem("eca_care_token");
+    showLock();
+    return { ok: false, locked: true, message: t("lockedMsg") };
+  }
+  return res.json();
+}
+
+async function checkSecurity() {
+  try {
+    const j = await (await fetch("/api/security")).json();
+    pinRequired = !!j.pin_required;
+  } catch (e) { pinRequired = false; }
+}
+
+function showLock() {
+  document.body.classList.add("locked");
+  $("pinError").textContent = "";
+  $("pinInput").value = "";
+  $("lockScreen").classList.add("on");
+  setTimeout(() => $("pinInput").focus(), 50);
+}
+
+function hideLock() {
+  document.body.classList.remove("locked");
+  $("lockScreen").classList.remove("on");
+}
+
+function cancelPin() {
+  hideLock();
+  setMode("resident");          // never strand them on a blank locked screen
+}
+
+function pinTyping() {
+  $("pinInput").classList.remove("wrong");
+  $("pinError").textContent = "";
+}
+
+async function submitPin() {
+  const pin = $("pinInput").value.trim();
+  if (!pin) return;
+  try {
+    const j = await (await fetch("/api/security/unlock", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }) })).json();
+    if (!j.ok) {
+      const box = $("pinInput");
+      box.classList.add("wrong");
+      box.value = "";
+      box.focus();
+      $("pinError").textContent = t("lockWrong");
+      return;
+    }
+    careToken = j.token || "";
+    if (careToken) sessionStorage.setItem("eca_care_token", careToken);
+    hideLock();
+    refreshTab();
+  } catch (e) { $("pinError").textContent = String(e); }
+}
+
+/** Called when entering care mode: ask for the PIN if we do not hold a session. */
+async function ensureUnlocked() {
+  await checkSecurity();
+  if (pinRequired && !careToken) { showLock(); return false; }
+  return true;
+}
+
+/* ================= URGENT ALERTS =================
+   The point of noticing "my chest hurts" is that somebody is told. This shows
+   what was raised and, honestly, whether it actually went anywhere. */
+
+function showUrgent(alert) {
+  if (!alert) return;
+  const ch = alert.channels || {};
+  const sent = Object.entries(ch).filter(([k, v]) => v && k !== "in_app")
+                                 .map(([k]) => k);
+  const who = (alert.contacts || []).map(c => c.name).join(", ");
+  $("urgentBanner").innerHTML = `
+    <div class="note bad" style="align-items:flex-start">
+      <span class="ic">\u{1F6A8}</span>
+      <div style="flex:1">
+        <b>${esc(t("alertUrgentTitle"))}</b>
+        <div style="margin-top:3px">${esc(alert.label)}${who ? " \u00b7 " + esc(t("alertTo")(who)) : ""}</div>
+        <small>${sent.length ? esc(t("alertRaised")) : esc(t("alertNoChannels"))}</small>
+      </div>
+      <button class="btn ghost" onclick="document.getElementById('urgentBanner').innerHTML=''">\u00d7</button>
+    </div>`;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function loadAlerts() {
+  let j;
+  try {
+    j = await (await fetch(`/api/alerts?resident_id=${state.residentId}&limit=15`)).json();
+  } catch (e) { return; }
+  if (!j.ok) return;
+
+  const on = Object.entries(j.channels).filter(([k, v]) => v && k !== "in_app")
+                                       .map(([k]) => k);
+  $("alertChannels").textContent = on.length
+    ? t("alertChannelsOn")(on.join(", ")) : t("alertChannelsOff");
+
+  $("alertList").innerHTML = j.alerts.length ? j.alerts.map(a => `
+    <div class="row-item ${a.acknowledged ? "" : ""}" style="align-items:flex-start">
+      <div class="grow">
+        <b>${esc(a.label)}</b>
+        <span class="pill ${a.acknowledged ? "" : "bad"}">${a.acknowledged ? t("alertAcked") : a.source}</span>
+        <div class="muted" style="margin-top:3px">${esc(a.day)} ${esc(a.time)}
+          ${a.quote ? ` \u00b7 \u201c${esc(a.quote.slice(0, 80))}\u201d` : ""}</div>
+        <div class="tiny" style="margin-top:3px">${esc(a.delivery || t("alertSending"))}</div>
+      </div>
+      ${a.acknowledged ? "" :
+        `<button class="btn ghost" onclick="ackAlert(${a.id})">${t("alertAck")}</button>`}
+    </div>`).join("") : `<p class="muted">${t("alertNone")}</p>`;
+}
+
+async function ackAlert(id) {
+  await fetch(`/api/alerts/${id}/ack`, { method: "POST" });
+  loadAlerts();
+}
+
+async function sendTestAlert() {
+  $("alertTestStatus").innerHTML = `<span class="spinner"></span>${t("alertSending")}`;
+  try {
+    const j = await (await fetch("/api/alerts/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resident_id: state.residentId, lang }) })).json();
+    $("alertTestStatus").textContent = j.ok ? "\u2713" : (j.message || "");
+    // Delivery happens on a worker thread; give it a moment before reading back.
+    setTimeout(loadAlerts, 2500);
+  } catch (e) { $("alertTestStatus").textContent = String(e); }
+}
+
 /* ================= FAMILY ================= */
 const famWord = s => s == null ? t("famNoReading")
   : s >= 75 ? t("famDoingWell") : s >= 60 ? t("famAllRight")
@@ -1011,7 +1510,7 @@ async function loadFamily() {
   if (!state.residentId) return;
   let j;
   try {
-    j = await (await fetch(`/api/family/overview?resident_id=${state.residentId}`)).json();
+    j = await careFetch(`/api/family/overview?resident_id=${state.residentId}`);
   } catch (e) { return; }
   if (!j.ok) { $("famHero").innerHTML = `<div class="sub">${esc(j.message)}</div>`; return; }
 
@@ -1052,6 +1551,7 @@ async function loadFamily() {
     <div class="stat"><span class="label">${t("cTalks")}</span><b>${j.today_count}</b></div>`;
 
   loadFamContacts();
+  loadAlerts();
   loadFamTimeline();
   loadFamDigest();
 }
@@ -1059,13 +1559,13 @@ async function loadFamily() {
 async function loadFamDigest() {
   $("famDigest").innerHTML = `<span class="spinner"></span><span class="sub">${t("working")}</span>`;
   try {
-    const j = await (await fetch(`/api/family/digest?resident_id=${state.residentId}&lang=${lang}`)).json();
+    const j = await careFetch(`/api/family/digest?resident_id=${state.residentId}&lang=${lang}`);
     $("famDigest").innerHTML = j.ok ? `<div class="note info">\ud83d\udcac ${esc(j.digest)}</div>` : "";
   } catch (e) { $("famDigest").innerHTML = ""; }
 }
 
 async function loadFamTimeline() {
-  const j = await (await fetch(`/api/family/timeline?resident_id=${state.residentId}&days=14`)).json();
+  const j = await careFetch(`/api/family/timeline?resident_id=${state.residentId}&days=14`);
   if (!j.ok) return;
   $("famTimeline").innerHTML = `<table style="width:100%;border-collapse:collapse">
     ${j.days.map(d => `<tr style="border-bottom:1px solid var(--line)">
@@ -1099,11 +1599,12 @@ async function famAddContact() {
   const j = await (await fetch("/api/contacts", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, phone, relationship: $("fcRel").value.trim(),
+                           email: $("fcEmail").value.trim(),
                            is_primary: $("fcPrimary").checked,
                            resident_id: state.residentId })
   })).json();
   if (!j.ok) { $("fcStatus").textContent = j.message; return; }
-  ["fcName", "fcRel", "fcPhone"].forEach(id => $(id).value = "");
+  ["fcName", "fcRel", "fcPhone", "fcEmail"].forEach(id => $(id).value = "");
   $("fcPrimary").checked = false;
   $("fcStatus").textContent = t("fcAdded");
   loadFamContacts();
@@ -1496,7 +1997,7 @@ async function makeReport() {
   $("repStatus").innerHTML = `<span class="spinner"></span>${t("thinking")}`;
   $("repBtn").disabled = true;
   try {
-    const j = await (await fetch(`/api/report?resident_id=${state.residentId}&lang=${lang}`)).json();
+    const j = await careFetch(`/api/report?resident_id=${state.residentId}&lang=${lang}`);
     if (!j.ok) { $("repOut").innerHTML = `<div class="note bad">${esc(j.message)}</div>`; return; }
     if (j.empty) { $("repOut").innerHTML = `<div class="note info">${t("emptyReport")}</div>`; return; }
     $("repOut").innerHTML = `<pre class="report">${esc(j.report)}</pre>`;

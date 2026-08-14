@@ -65,21 +65,35 @@ def connection_class():
     return SmallWebRTCConnection
 
 
-def install_hooks(store, system_prompt_fn, call_offer_fn=None):
+def install_hooks(store, system_prompt_fn, call_offer_fn=None, alert_fn=None):
     """Point the imported pipeline at this app's store and prompt.
 
-    `call_offer_fn(conversation_id, text) -> dict | None` lets the host spot a
-    spoken request to phone someone and push the offer to the browser.
+    `call_offer_fn(conversation_id, text) -> dict | None` spots a spoken
+    request to phone someone. `alert_fn(conversation_id, text) -> dict | None`
+    spots an urgent symptom and raises the alert. Both must be wired here as
+    well as on the typed path: a hands-free call is exactly when someone is
+    most likely to say "my chest hurts" out loud.
     """
     vp = _load()
     if vp is None:
         return False
+
+    # What the last user turn raised, so the app message can carry it.
+    pending = {"alert": None}
 
     def add_message(conversation_id, role, content):
         text = (content or "").strip()
         if not text:
             return                            # never store empty turns
         store.add_message(conversation_id, role, text)
+
+        # Raise urgent alerts here, not in the app-message hook, so help is on
+        # its way the moment the words are transcribed.
+        if role == "user" and alert_fn:
+            try:
+                pending["alert"] = alert_fn(conversation_id, text)
+            except Exception:                 # noqa: BLE001 - never break the call
+                pending["alert"] = None
 
     def audio_sink(conversation_id, pcm, sample_rate):
         """Keep the recording of a spoken turn, so its tone can be analysed.
@@ -92,11 +106,24 @@ def install_hooks(store, system_prompt_fn, call_offer_fn=None):
             store.save_audio_pcm(conversation_id, message_id, pcm, sample_rate)
 
     def app_message_hook(conversation_id, role, text):
-        """Offer a phone call when the resident asks for one out loud."""
-        if role != "user" or not call_offer_fn:
+        """Push anything the transcript alone cannot show to the browser.
+
+        An urgent alert takes precedence over a call offer -- if both somehow
+        fire on one turn, the emergency is the thing to put on screen.
+        """
+        if role != "user":
             return None
-        offer = call_offer_fn(conversation_id, text)
-        return {"type": "call", **offer} if offer else None
+
+        alert = pending.pop("alert", None)
+        pending["alert"] = None
+        if alert:
+            return {"type": "alert", **alert}
+
+        if call_offer_fn:
+            offer = call_offer_fn(conversation_id, text)
+            if offer:
+                return {"type": "call", **offer}
+        return None
 
     vp.add_message = add_message
     vp.build_system_prompt = system_prompt_fn

@@ -163,11 +163,12 @@ body[data-mode="resident"] .btn{padding:15px 22px}
 .empty .big{font-size:2rem; display:block; margin-bottom:var(--s2); opacity:.55}
 
 /* ---------------- forms ---------------- */
-input[type=text],textarea,select.f{
+input[type=text],input[type=password],textarea,select.f{
   font:inherit; width:100%; padding:11px 13px; border:1px solid var(--line-2);
   border-radius:var(--r-sm); background:var(--surface); color:var(--ink);
 }
-input[type=text]:focus,textarea:focus{outline:2px solid var(--brand-soft);
+input[type=text]:focus,input[type=password]:focus,textarea:focus{
+  outline:2px solid var(--brand-soft);
   border-color:var(--brand); outline-offset:0}
 textarea{min-height:120px; resize:vertical}
 .field{display:flex; flex-direction:column; gap:5px}
@@ -265,6 +266,16 @@ tr:last-child td{border-bottom:none}
 
 .spark{display:flex; align-items:flex-end; gap:3px; height:60px}
 .spark div{flex:1; border-radius:3px 3px 0 0; min-height:3px; opacity:.9}
+/* wellbeing trend */
+.trend{width:100%}
+.trend .cap{display:flex; justify-content:space-between; align-items:baseline;
+            margin-bottom:var(--s2)}
+.trend .now{font-size:1.9rem; font-weight:800; line-height:1; letter-spacing:-.02em}
+.trend .delta{font-size:.82rem; font-weight:700}
+.trend svg{width:100%; height:96px; display:block; overflow:visible}
+.trend .axis{font-size:9px; fill:var(--ink-3)}
+.trend .days{display:flex; justify-content:space-between;
+             font-size:.7rem; color:var(--ink-3); margin-top:5px}
 
 pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
            border:1px solid var(--line); border-radius:var(--r-md);
@@ -318,6 +329,90 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
   border:1px solid var(--line-2); border-radius:8px; background:var(--surface);
 }
 @media (max-width:640px){ .democlock{right:10px; bottom:10px} }
+
+/* ---------------- care-team lock ----------------
+   The resident's screens are never locked; the clinical views are. */
+.lock{position:fixed; inset:0; z-index:80; background:rgba(24,28,34,.42);
+      display:none; align-items:center; justify-content:center; padding:var(--s4);
+      /* Health records must not be readable through the lock screen. */
+      backdrop-filter:blur(14px) saturate(.7);
+      -webkit-backdrop-filter:blur(14px) saturate(.7)}
+/* Belt and braces: browsers without backdrop-filter still blur the page. */
+body.locked main, body.locked nav, body.locked #medReminder,
+body.locked #urgentBanner{filter:blur(9px); pointer-events:none;
+                          user-select:none; transition:filter .18s}
+.lock.on{display:flex}
+.lock .box{background:var(--surface); border-radius:var(--r-lg);
+           padding:var(--s6) var(--s5) var(--s5); box-shadow:var(--shadow-lg);
+           width:100%; max-width:340px; text-align:center;
+           animation:lockin .18s ease-out}
+@keyframes lockin{from{opacity:0; transform:translateY(6px) scale(.98)}
+                  to{opacity:1; transform:none}}
+.lock .badge{width:54px; height:54px; border-radius:50%; margin:0 auto var(--s4);
+             background:var(--brand-soft); display:grid; place-items:center;
+             font-size:1.5rem}
+.lock h3{font-size:1.15rem; margin-bottom:4px}
+.lock .box .muted{font-size:.85rem; line-height:1.45}
+/* type=password is not covered by the global input rule, which is why this
+   field used to overflow its card. */
+.lock input[type=password]{
+  display:block; width:100%; box-sizing:border-box; margin:var(--s5) 0 0;
+  font:inherit; font-size:1.5rem; font-variant-numeric:tabular-nums;
+  text-align:center; letter-spacing:.6em; text-indent:.6em;
+  padding:12px 10px; border:1px solid var(--line-2); border-radius:var(--r-sm);
+  background:var(--surface-2); color:var(--ink); transition:.15s;
+}
+.lock input[type=password]:focus{outline:none; border-color:var(--brand);
+  background:var(--surface); box-shadow:0 0 0 3px var(--brand-soft)}
+.lock input[type=password].wrong{border-color:var(--bad);
+  box-shadow:0 0 0 3px var(--bad-soft); animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)}
+                 75%{transform:translateX(5px)}}
+.lock .err{color:var(--bad); font-size:.82rem; font-weight:600;
+           min-height:1.25em; margin-top:var(--s2)}
+.lock .actions{display:grid; grid-template-columns:1fr 1fr; gap:var(--s2);
+               margin-top:var(--s3)}
+.lock .hint{margin-top:var(--s4); font-size:.72rem; color:var(--ink-3);
+            line-height:1.5}
+
+/* ---------------- guardian mode ----------------
+   A device that listens must look like it is listening. Never subtle. */
+.guardian{border:1px solid var(--line); border-radius:var(--r-md);
+          padding:var(--s4); background:var(--surface);
+          display:flex; gap:var(--s4); align-items:center; flex-wrap:wrap}
+.guardian.on{border-color:var(--brand); background:var(--brand-soft)}
+.guardian .grow{flex:1; min-width:200px}
+.guardian .ear{font-size:1.6rem; line-height:1}
+.guardian.on .ear{animation:earpulse 1.6s ease-in-out infinite}
+@keyframes earpulse{0%,100%{opacity:.45; transform:scale(1)}
+                    50%{opacity:1; transform:scale(1.14)}}
+.livedot{display:inline-block; width:9px; height:9px; border-radius:50%;
+         background:var(--bad); margin-right:7px; vertical-align:1px;
+         animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1} 50%{opacity:.25}}
+
+/* ---------------- voice mode ----------------
+   Screen-free operation: one enormous status the resident can read from
+   across the room, and nothing else to understand. */
+.voicestage{display:flex; flex-direction:column; align-items:center;
+            justify-content:center; text-align:center; padding:var(--s7) var(--s4);
+            border-radius:var(--r-lg); background:var(--surface);
+            border:1px solid var(--line); box-shadow:var(--shadow); min-height:56vh}
+.voicestage.awake{background:var(--brand-soft); border-color:var(--brand)}
+.voicestage.alarm{background:var(--bad-soft); border-color:var(--bad)}
+.voiceorb{width:150px; height:150px; border-radius:50%; display:grid;
+          place-items:center; font-size:4rem; background:var(--bg);
+          border:3px solid var(--line-2); margin-bottom:var(--s5)}
+.voicestage.awake .voiceorb{border-color:var(--brand); background:#fff;
+                            animation:orbpulse 1.5s ease-in-out infinite}
+.voicestage.alarm .voiceorb{border-color:var(--bad); background:#fff}
+@keyframes orbpulse{0%,100%{transform:scale(1); box-shadow:0 0 0 0 rgba(28,107,102,.35)}
+                    50%{transform:scale(1.05); box-shadow:0 0 0 18px rgba(28,107,102,0)}}
+.voicestate{font-size:1.7rem; font-weight:750; letter-spacing:-.02em}
+.voicehint{color:var(--ink-2); margin-top:var(--s2); font-size:1.05rem}
+.voiceheard{margin-top:var(--s5); font-size:1.05rem; max-width:640px}
+.voiceheard .you{color:var(--ink-2)}
+.voiceheard .said{font-weight:650; margin-top:var(--s2)}
 </style>
 </head>
 <body data-mode="resident">
@@ -328,6 +423,7 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
   <select class="person" id="who"></select>
   <div class="seg" id="modeSeg">
     <button id="modeResident" class="on" onclick="setMode('resident')" data-i="modeResident">Resident</button>
+    <button id="modeVoice" onclick="setMode('voice')" data-i="modeVoice">Voice</button>
     <button id="modeCare" onclick="setMode('care')" data-i="modeCare">Care team</button>
   </div>
   <div class="seg">
@@ -339,6 +435,7 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
 <nav id="nav">
   <!-- resident -->
   <button class="on" data-tab="residentHome" data-for="resident"><span class="ic">🏡</span><span data-i="tabHomeR">Home</span></button>
+  <button data-tab="voicehome" data-for="voice"><span class="ic">🤖</span><span data-i="tabVoice">Voice</span></button>
   <button data-tab="talk" data-for="both"><span class="ic">💬</span><span data-i="tabTalk">Talk</span></button>
   <button data-tab="checkin" data-for="both"><span class="ic">🩺</span><span data-i="tabCheckin">Check-in</span></button>
   <!-- care team -->
@@ -349,6 +446,7 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
   <button data-tab="report" data-for="care"><span class="ic">📋</span><span data-i="tabReport">Report</span></button>
 </nav>
 
+<div id="urgentBanner" style="padding:0 var(--s5); max-width:1160px"></div>
 <div id="medReminder" style="padding:0 var(--s5); max-width:1160px"></div>
 
 <main>
@@ -372,6 +470,34 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
     </div>
 
     <div id="residentNext" style="margin-top:var(--s5)"></div>
+
+      <div class="guardian" id="guardianBox" style="margin-top:var(--s5)">
+        <span class="ear" id="guardianEar">👂</span>
+        <div class="grow">
+          <b data-i="guardTitle">Guardian mode</b>
+          <div class="muted" id="guardStatus" data-i="guardOff">Off. Nobody is listening to this room.</div>
+          <div class="tiny" id="guardHeard" style="margin-top:4px"></div>
+        </div>
+        <button class="btn" id="guardBtn" onclick="toggleGuardian()" data-i="guardStart">Start listening</button>
+      </div>
+
+  </section>
+
+
+  <!-- ============ VOICE MODE ============ -->
+  <section class="panel" id="voicehome">
+    <div class="voicestage" id="voiceStage">
+      <div class="voiceorb" id="voiceOrb">🤖</div>
+      <div class="voicestate" id="voiceState" data-i="vmOff">Voice mode is off</div>
+      <div class="voicehint" id="voiceHint" data-i="vmOffHint">Press start, then just say “Hello Robo”.</div>
+      <div class="voiceheard" id="voiceHeard"></div>
+      <button class="btn lg" id="voiceBtn" onclick="toggleVoiceMode()"
+              style="margin-top:var(--s5); min-width:230px" data-i="vmStart">Start voice mode</button>
+      <div class="tiny" style="margin-top:var(--s4); max-width:520px" data-i="vmPrivacy">
+        While asleep it only listens for “Hello Robo” and for a call for help.
+        Nothing is recorded; what it hears is checked and discarded.
+      </div>
+    </div>
   </section>
 
   <!-- ============ CARE: TODAY ============ -->
@@ -599,6 +725,7 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
         <div class="field"><span class="lbl" data-i="fcName">Name</span><input type="text" id="fcName" placeholder="Kenji Tanaka"></div>
         <div class="field"><span class="lbl" data-i="fcRel">Relationship</span><input type="text" id="fcRel" placeholder="grandson"></div>
         <div class="field"><span class="lbl" data-i="fcPhone">Phone</span><input type="text" id="fcPhone" placeholder="+81 90 1234 5678"></div>
+        <div class="field"><span class="lbl" data-i="fcEmail">Email (for alerts)</span><input type="text" id="fcEmail" placeholder="kenji@example.com"></div>
       </div>
       <div style="display:flex; gap:var(--s3); align-items:center; margin-top:var(--s3); flex-wrap:wrap">
         <label class="muted" style="display:flex; align-items:center; gap:7px">
@@ -606,6 +733,18 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
         </label>
         <button class="btn" onclick="famAddContact()" data-i="fcAdd">Add contact</button>
         <span class="muted" id="fcStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:var(--s4)">
+      <div class="card-head">
+        <h3 data-i="alertsTitle">Urgent alerts</h3>
+        <span class="muted" id="alertChannels"></span>
+      </div>
+      <div id="alertList"></div>
+      <div style="margin-top:var(--s3)">
+        <button class="btn ghost" onclick="sendTestAlert()" data-i="btnTestAlert">Send a test alert</button>
+        <span class="muted" id="alertTestStatus" style="margin-left:var(--s2)"></span>
       </div>
     </div>
 
@@ -662,6 +801,25 @@ pre.report{white-space:pre-wrap; font:inherit; background:var(--surface-2);
     <div class="rowb" style="margin-top:7px; margin-bottom:0">
       <button onclick="clockReset()" data-i="dcReal">Real time</button>
     </div>
+  </div>
+</div>
+
+
+<div class="lock" id="lockScreen">
+  <div class="box">
+    <div class="badge">🔒</div>
+    <h3 data-i="lockTitle">Care team view</h3>
+    <p class="muted" data-i="lockSub">Enter the PIN to see health records.</p>
+    <input type="password" id="pinInput" inputmode="numeric" autocomplete="off"
+           maxlength="8" placeholder="••••"
+           oninput="pinTyping()"
+           onkeydown="if(event.key==='Enter')submitPin()">
+    <div class="err" id="pinError"></div>
+    <div class="actions">
+      <button class="btn ghost" onclick="cancelPin()" data-i="lockCancel">Back</button>
+      <button class="btn" onclick="submitPin()" data-i="lockUnlock">Unlock</button>
+    </div>
+    <div class="hint" data-i="lockHint">The resident's own screens are never locked.</div>
   </div>
 </div>
 

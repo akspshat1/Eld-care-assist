@@ -1,8 +1,10 @@
 """SQLite storage for check-ins, conversations and daily records.
 
-Privacy: no photos or audio are ever written to disk. Only the readings taken
-from them -- an emotion label, a transcript the resident chose to record --
-are stored.
+Privacy: check-in photos are analysed in memory and never written to disk.
+Spoken conversation turns ARE kept, so their tone can be analysed later --
+those recordings are encrypted at rest (see security.py) and deleted after the
+retention period. Everything else stored is text: labels, transcripts and
+timestamps.
 """
 
 import os
@@ -12,6 +14,7 @@ import threading
 from datetime import datetime, date, timedelta
 
 import config
+import security
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS residents (
@@ -87,6 +90,37 @@ CREATE TABLE IF NOT EXISTS call_log (
     day         TEXT NOT NULL,
     source      TEXT NOT NULL DEFAULT 'conversation'
 );
+
+-- Urgent alerts, and what actually happened to them. Kept even when nothing
+-- could be delivered, so the record shows whether anyone was really told.
+-- Who did what to the record. Health data should never be silently readable
+-- or exportable without a trace.
+CREATE TABLE IF NOT EXISTS audit (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts      REAL NOT NULL,
+    day     TEXT NOT NULL,
+    action  TEXT NOT NULL,
+    detail  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_audit_day ON audit(day);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    resident_id   INTEGER NOT NULL,
+    ts            REAL NOT NULL,
+    day           TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    label         TEXT NOT NULL,
+    quote         TEXT,
+    source        TEXT NOT NULL,         -- checkin | conversation
+    subject       TEXT,
+    body          TEXT,
+    contact_count INTEGER NOT NULL DEFAULT 0,
+    delivery      TEXT,                  -- what each channel reported
+    acknowledged  INTEGER NOT NULL DEFAULT 0,
+    ack_ts        REAL
+);
+CREATE INDEX IF NOT EXISTS idx_alert_day ON alerts(day);
 
 CREATE TABLE IF NOT EXISTS conv_records (
     conversation_id INTEGER PRIMARY KEY,
@@ -174,8 +208,10 @@ class Store:
         folder = os.path.join(AUDIO_DIR, str(conversation_id))
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, f"{message_id}.{ext}")
+        # Encrypted at rest: a recording of someone's voice is the most
+        # sensitive thing this app keeps.
         with open(path, "wb") as fh:
-            fh.write(audio_bytes)
+            fh.write(security.encrypt_bytes(audio_bytes))
         with self._lock:
             self._conn.execute("UPDATE messages SET audio_path=? WHERE id=?",
                                (path, message_id))
@@ -370,6 +406,73 @@ class Store:
                 " WHERE r.day=? ORDER BY r.ts", (day,)).fetchall()
         return [_dict(r) for r in rows]
 
+    # --------------------------------------------------------------- audit --
+    def audit(self, action, detail=""):
+        ts = datetime.now().timestamp()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO audit (ts, day, action, detail) VALUES (?,?,?,?)",
+                (ts, datetime.fromtimestamp(ts).strftime("%Y-%m-%d"),
+                 action, str(detail)[:300]))
+            self._conn.commit()
+
+    def audit_log(self, limit=50):
+        with self._lock:
+            rows = [_dict(r) for r in self._conn.execute(
+                "SELECT * FROM audit ORDER BY ts DESC LIMIT ?", (limit,)).fetchall()]
+        for r in rows:
+            r["time"] = datetime.fromtimestamp(r["ts"]).strftime("%H:%M")
+        return rows
+
+    # -------------------------------------------------------------- alerts --
+    def now_string(self):
+        """Current time as text -- follows the demo clock when one is set."""
+        return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    def add_alert(self, resident_id, kind, label, quote, source,
+                  subject="", body="", contact_count=0):
+        ts = datetime.now().timestamp()
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO alerts (resident_id, ts, day, kind, label, quote,"
+                " source, subject, body, contact_count)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (resident_id, ts,
+                 datetime.fromtimestamp(ts).strftime("%Y-%m-%d"),
+                 kind, label, quote, source, subject, body, contact_count))
+            self._conn.commit()
+            return cur.lastrowid
+
+    def set_alert_delivery(self, alert_id, delivery):
+        with self._lock:
+            self._conn.execute("UPDATE alerts SET delivery=? WHERE id=?",
+                               (delivery, alert_id))
+            self._conn.commit()
+
+    def acknowledge_alert(self, alert_id):
+        with self._lock:
+            self._conn.execute(
+                "UPDATE alerts SET acknowledged=1, ack_ts=? WHERE id=?",
+                (datetime.now().timestamp(), alert_id))
+            self._conn.commit()
+
+    def alerts(self, resident_id=None, limit=20, unacknowledged_only=False):
+        q = "SELECT * FROM alerts WHERE 1=1"
+        args = []
+        if resident_id:
+            q += " AND resident_id=?"
+            args.append(resident_id)
+        if unacknowledged_only:
+            q += " AND acknowledged=0"
+        q += " ORDER BY ts DESC LIMIT ?"
+        args.append(limit)
+        with self._lock:
+            rows = [_dict(r) for r in self._conn.execute(q, args).fetchall()]
+        for r in rows:
+            r["time"] = datetime.fromtimestamp(r["ts"]).strftime("%H:%M")
+            r["acknowledged"] = bool(r["acknowledged"])
+        return rows
+
     # ------------------------------------------------------------ contacts --
     def contacts(self, resident_id=None):
         """Contacts for this resident, plus any shared ones (resident_id NULL)."""
@@ -389,6 +492,20 @@ class Store:
 
     def add_contact(self, name, phone, relationship="", resident_id=None,
                     email="", is_primary=False, notes=""):
+        # Adding the same person twice would page them twice and clutter the
+        # alert; update the existing entry instead.
+        for c in self.contacts(resident_id):
+            same_phone = (c.get("phone") or "").strip() == (phone or "").strip()
+            same_name = (c.get("name") or "").lower() == (name or "").lower()
+            if same_phone or same_name:
+                self.update_contact(c["id"], {
+                    "name": name, "phone": phone,
+                    "relationship": relationship or c.get("relationship"),
+                    "email": email or c.get("email"),
+                    "is_primary": is_primary or c.get("is_primary"),
+                })
+                return c["id"]
+
         with self._lock:
             cur = self._conn.execute(
                 "INSERT INTO contacts (resident_id, name, relationship, phone,"

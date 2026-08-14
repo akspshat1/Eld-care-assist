@@ -83,6 +83,17 @@ def report_features():
     print(f"Voice model: {'ready' if st['voice'] else 'missing'}"
           + ("" if st["voice"] else "   (cd voice_rec && python download_models.py, 1.2 GB)"))
     print(f"Medicines  : {'ready' if st['medications'] else 'missing'}")
+
+    # Security posture, stated plainly at startup.
+    import security
+    import store as _store
+    sec = security.status()
+    print(f"Care PIN   : {'set' if sec['pin_required'] else 'not set (care view is open)'}")
+    print(f"Audio      : {'encrypted at rest' if sec['audio_encrypted'] else 'NOT encrypted'}"
+          + (f", kept {sec['retention_days']} days" if sec['retention_days'] else ", kept forever"))
+    removed = security.purge_old_audio(_store.AUDIO_DIR, sec["retention_days"])
+    if removed:
+        print(f"             purged {removed} recording(s) past retention")
     print(f"Hands-free : {'ready' if st['handsfree'] else 'missing'}")
     if not st["handsfree"]:
         # Naming the interpreter matters: pipecat installed into a different

@@ -84,6 +84,39 @@ IMAGE_MAX_SIDE = int(os.environ.get("ECA_IMAGE_MAX_SIDE", "1200"))
 DATA_DIR = os.path.join(HERE, "data")
 DB_PATH = os.path.join(DATA_DIR, "care.db")
 
+# ---------------------------------------------------------- security ------
+# PIN for the care team / family / medicine / report views. The resident's own
+# view is never locked. Leave unset and nothing is locked at all -- a
+# forgotten PIN must not keep a caregiver from a medication schedule.
+CARE_PIN = os.environ.get("CARE_PIN", "")
+
+# Voice recordings are deleted after this many days. Set 0 to keep them.
+AUDIO_RETENTION_DAYS = int(os.environ.get("AUDIO_RETENTION_DAYS", "30"))
+
+# Key used to encrypt stored recordings. Generated into .env on first run if
+# absent -- every secret this app holds lives in that one gitignored file.
+AUDIO_KEY = os.environ.get("AUDIO_KEY", "")
+
+
+# ------------------------------------------------------ urgent alerts ------
+# How an urgent symptom reaches a real person. Every one of these is optional:
+# with none set, alerts are still recorded and shown in the app, and the UI
+# says plainly that nothing was sent. See alerts.py.
+
+# Any URL that accepts a JSON POST -- a Discord or Slack incoming webhook is
+# the quickest thing to demo with.
+ALERT_WEBHOOK_URL = os.environ.get("ALERT_WEBHOOK_URL", "")
+
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+ALERT_FROM = os.environ.get("ALERT_FROM", "")
+
+TWILIO_SID = os.environ.get("TWILIO_SID", "")
+TWILIO_TOKEN = os.environ.get("TWILIO_TOKEN", "")
+TWILIO_FROM = os.environ.get("TWILIO_FROM", "")
+
 # --- names Converse_2way's modules expect from a module called `config` ---
 # Its hands-free voice pipeline is reused as-is (see handsfree.py). Because
 # this app's config is already imported as `config`, its `from config import

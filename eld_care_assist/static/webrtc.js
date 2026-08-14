@@ -46,6 +46,11 @@ async function startHandsFreeCall(conversationId, opts = {}) {
         if (opts.onCall) opts.onCall(parsed);
         return;
       }
+      // An urgent symptom heard mid-call: the caregiver has been alerted.
+      if (parsed && parsed.type === "alert") {
+        if (opts.onAlert) opts.onAlert(parsed);
+        return;
+      }
       if (isTurn(parsed) && onTurn) onTurn(parsed);
     } catch { /* ignore non-JSON protocol frames */ }
   };
