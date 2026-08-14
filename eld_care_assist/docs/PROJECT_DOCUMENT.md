@@ -55,7 +55,7 @@ Elder Care Assistant はこれらを1つの画面から呼び出せるように�
    「How they have been / Worth watching / Needs attention」の3区分でまとまり、CSVでも出力できる。
 
 胸の痛み・呼吸困難・転倒・めまいなど緊急性の高い発言があった場合は、
-上記のAI処理を待たずハードコードされたルールで即座にフラグが立ちます（4.6節）。
+上記のAI処理を待たずハードコードされたルールで即座にフラグが立ちます（4.7節）。
 
 ## 4. System architecture
 
@@ -63,11 +63,16 @@ Elder Care Assistant はこれらを1つの画面から呼び出せるように�
 
 - **1つの統合ハブ、機能はすべて姉妹アプリから再利用** — 顔感情・声感情・服薬管理・
   ハンズフリー音声パイプラインは自前で実装せず、隣接リポジトリを動的インポートして使う
-- **AI呼び出しは `groq_api.py` に一元化** — チャット、Vision（処方箋読取）、
+- **会話系のAI呼び出しは `groq_api.py` に一元化** — チャット、Vision（処方箋読取）、
   Whisper（音声認識）をすべてGroq API経由で行い、レート制限時は自動リトライする
+- **記録済みデータからのレポート生成だけは `orca_router_api.py` 経由** — 日次レポート
+  （`/api/report`）、家族向けダイジェスト（`/api/family/digest`）、会話からの記録抽出
+  （`/api/conversation/{cid}/record`）の3箇所だけが、OpenAI互換のOrcaRouter API
+  （`orcarouter/auto`）を叩く。会話そのものやチェックインの聞き取りはOrcaRouterを経由しない。
+  OrcaRouterに到達できない場合は同じ呼び出しシグネチャの`groq_api`へ自動的にフォールバックする
 - **安全性はネットワークに依存させない** — 緊急症状の検知はAIではなくハードコードのルール
 - **生データは基本的に保持しない** — 写真や音声はメモリ内処理で捨て、抽出結果
-  （ラベル・テキスト・タイムスタンプ）のみをSQLiteに保存する。唯一の例外が会話音声（4.6節）
+  （ラベル・テキスト・タイムスタンプ）のみをSQLiteに保存する。唯一の例外が会話音声（4.7節）
 
 ### 4.2 コンポーネント構成
 
@@ -80,10 +85,11 @@ run.py            起動（依存チェック → server.serve() → ブラウ�
        │    ├─ ../voice_rec   声感情（HuBERT, 日本語, 1.2GB）
        │    └─ ../med_mgmt    服薬ストア + 処方箋リーダー
        ├─ groq_api.py   Groq API呼び出し（chat / vision / whisper）
+       ├─ orca_router_api.py  OrcaRouter API呼び出し（レポート生成専用、Groqへフォールバック）
        ├─ checkin.py    質問定義・聞き取り・採点・緊急ルール・要約
        ├─ handsfree.py  ../Converse_2way のPipecatパイプラインへのブリッジ
        ├─ calls.py      会話中の「電話して」発話検知 → tel:リンク生成
-       ├─ family.py     ../fam_dashboard 連携（14日ロールアップ・要約）
+       ├─ family.py     ../fam_dashboard 連携（14日ロールアップ・要約、OrcaRouter使用）
        ├─ democlock.py  デモ用の時刻操作（服薬リマインダー等の検証用）
        └─ store.py      SQLite永続化（residents / checkins / conversations /
                          messages / contacts / call_log / conv_records）
@@ -102,13 +108,16 @@ flowchart LR
     Server --> Store[(store.py / SQLite care.db)]
     Checkin --> Groq[groq_api.py]
     Handsfree --> Groq
-    Family --> Groq
+    Server --> Orca[orca_router_api.py]
+    Family --> Orca
+    Orca -. フォールバック .-> Groq
     Engines --> FaceRec[../Face_rec]
     Engines --> VoiceRec[../voice_rec]
     Engines --> MedMgmt[../med_mgmt]
     Handsfree --> Converse[../Converse_2way Pipecatパイプライン]
     Family --> FamDash[../fam_dashboard]
     Groq --> GroqCloud[(Groq API)]
+    Orca --> OrcaCloud[(OrcaRouter API)]
 ```
 
 ### 4.3 API仕様（Request/Response）
@@ -122,7 +131,7 @@ flowchart LR
 | 会話 | `POST /api/conversation/start`, `GET/POST /api/conversation/{cid}/messages,say,say_audio,voice/offer,analyze_voice,voice_summary,record` | 会話開始、発話（テキスト/音声）、WebRTCオファー、声のトーン分析、記録保存 |
 | 連絡・通話 | `GET /api/contacts`, `POST /api/contacts`, `POST /api/calls/{contact_id}/log` | 連絡先管理、電話発信ログ |
 | 服薬 | `GET /api/medications`, `GET /api/medications/today`, `POST /api/medications/dose,confirm_voice,extract_text,extract_photo,save` | 服薬一覧、本日分、服用記録、処方箋のテキスト/写真からの登録 |
-| レポート/家族 | `GET /api/report`, `GET /api/family/overview,timeline,digest`, `GET /api/export` | 日次レポート、家族向けロールアップ・要約、CSV出力 |
+| レポート/家族 | `GET /api/report`, `GET /api/family/overview,timeline,digest`, `GET /api/export` | 日次レポート、家族向けロールアップ・要約、CSV出力（`report`と`digest`はOrcaRouter優先・Groqフォールバック） |
 | デモ | `GET/POST /api/demo/clock` | デモ用の現在時刻オフセット設定 |
 
 代表的な例として、チェックインの音声聞き取り（`POST /api/checkin/answer_voice`）は
@@ -170,7 +179,23 @@ sequenceDiagram
 差し替えて再利用します。チェックイン中の音声対話もこの同じパイプラインの上で、
 インタビュー用プロンプトに切り替えて動いています。
 
-### 4.5 利点
+### 4.5 実行シーケンス（日次レポート生成の例）
+
+`GET /api/report` は当日のチェックイン・会話記録・服薬記録を1本のテキストに
+まとめ、`orca_router_api.chat()` に渡してレポートを生成させます。
+`/api/family/digest`（`family.py`）と会話の記録抽出`/api/conversation/{cid}/record`
+も同様にOrcaRouterをまず呼び、失敗時は同じ引数で`groq_api`に切り替わるため、
+レポート生成自体が止まることはありません。
+
+```mermaid
+flowchart LR
+    A["/api/report\n/api/family/digest\n/api/conversation/{cid}/record"] --> B{orca_router_api}
+    B -- 成功 --> C[レポート/要約テキスト]
+    B -- 到達不可 / 429 / 5xx --> D[groq_api にフォールバック]
+    D --> C
+```
+
+### 4.6 利点
 
 - **安定性** — チェックインのスコア・要約はGroq API障害時もローカルで計算されるため、
   利用者の回答がAPIエラーで失われることがない
@@ -180,14 +205,18 @@ sequenceDiagram
   1か所で管理できる
 - **直感性** — チェックインも会話もボタン操作なしで進められ、聞き取った内容は
   後からフォーム上で確認・修正できるため、AIの誤認識が記録に残るリスクを抑えている
+- **単一プロバイダ依存の回避** — レポート生成はOrcaRouterとGroqの2経路を持ち、
+  一方が不調でももう一方でレポートが作れる
 
-### 4.6 安全設計・フォールバック
+### 4.7 安全設計・フォールバック
 
 - **緊急症状はAIではなくハードコードのルールで検知**（胸痛・呼吸困難・転倒・めまい）。
   Groq APIが未応答・レート制限・誤動作していても、安全に関わる判定はネットワークに依存しない
 - **要約生成（Groq）が失敗した場合でもチェックインは保存される** — スコアと注意フラグは
   ローカルで計算され、回答から平易な要約が組み立てられる（`local_summary`）
-- **Groqのレート制限（429）は自動リトライ**され、短い待機で復旧する
+- **Groq・OrcaRouterともにレート制限（429）は自動リトライ**され、短い待機で復旧する
+- **OrcaRouterが到達不可・エラーの場合はGroqへ自動フォールバック**する
+  （日次レポート・家族ダイジェスト・会話記録抽出の3箇所のみ対象）
 - **写真は一度きりの評価に使うだけで保存しない** — 顔感情はメモリ内で処理して破棄し、
   wellbeingスコアへの重みも25%に留めている（本人の回答を優先する設計）
 - **音声が唯一ディスクに保存されるのは会話（Talk/チェックインの発話）のみ**
@@ -195,7 +224,7 @@ sequenceDiagram
   必要とし、かつ会話中に毎ターン重い推論を挟むと応答が重くなるため、
   分析は「Analyse voice tone」ボタンで事後的に行う設計になっている
 
-### 4.7 現時点の制約
+### 4.8 現時点の制約
 
 - **診断ではない** — 発言と観察結果を提示し、判断は人間に委ねる。プロンプト上も
   病名の断定や医療・服薬アドバイスは禁止されている
@@ -204,7 +233,7 @@ sequenceDiagram
 - **声感情モデルは日本語専用**（XLSR → 日本語ASR → JTES）。英語の発話に対しては
   自信度の高い誤った結果を返すことがあるため、英語音声のトーン判定は参考情報に留めるべき
 - **1枚の顔写真からの感情推定は根拠として弱い** — スコアへの重みは25%に制限
-- **Groq無料枠のレート制限**により、混雑時は応答が数秒遅れることがある（自動リトライで吸収）
+- **Groq・OrcaRouterとも無料枠のレート制限**があり、混雑時は応答が数秒遅れることがある（自動リトライで吸収）
 
 ## 5. 技術スタック
 
@@ -212,7 +241,8 @@ sequenceDiagram
 |---|---|
 | 言語 | Python（バックエンド）、JavaScript / HTML（フロントエンド） |
 | Webフレームワーク | FastAPI + Uvicorn |
-| AI API | Groq API（`llama-3.3-70b-versatile` ほか、Vision・Whisperモデルを含む） |
+| 会話・音声認識・画像理解 | Groq API（`llama-3.3-70b-versatile` / `qwen/qwen3.6-27b` / `whisper-large-v3-turbo`） |
+| レポート生成 | OrcaRouter API（`orcarouter/auto`、OpenAI互換、Groqへ自動フォールバック） |
 | 画像処理 | OpenCV, onnxruntime, Pillow（顔感情のONNXモデル推論） |
 | 音声対話 | pipecat-ai（WebRTC, Silero VAD, Groq）— `Converse_2way` から再利用 |
 | データストア | SQLite（`store.py`, `data/care.db`） |
@@ -226,6 +256,7 @@ eld_care_assist/
 ├─ config.py      .env読込・モデル設定・姉妹アプリのパス解決
 ├─ engines.py     姉妹アプリのモデル/ストアの遅延ローダー
 ├─ groq_api.py    Groq API呼び出し（chat / vision / whisper）
+├─ orca_router_api.py  OrcaRouter API呼び出し（レポート生成専用、Groqへフォールバック）
 ├─ checkin.py     チェックインの質問・採点・緊急ルール・要約
 ├─ handsfree.py   Converse_2wayのPipecatパイプラインへのブリッジ
 ├─ calls.py       会話中の「電話して」発話検知
@@ -256,19 +287,36 @@ python run.py --check       # 起動せず設定・依存関係だけ確認
 python run.py --port 8200   # 別ポートで起動（他の姉妹アプリは8000〜8002を使用）
 ```
 
-Groq APIキーはリポジトリルート共有の `.env` に設定します。
+Groq APIキー・OrcaRouter APIキーはリポジトリルート共有の `.env` に設定します。
 
 ```
 GROQ_API_KEY=gsk_your_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_WHISPER_MODEL=whisper-large-v3-turbo
+ORCAROUTER_API_KEY=your_orcarouter_api_key
 ```
 
 モデルは `config.py` で選択され、`.env` の `ECA_TEXT_MODEL` / `ECA_VISION_MODEL` /
-`ECA_WHISPER_MODEL` で上書きできます。APIキーや任意モデルが無くても起動は可能で、
+`ECA_WHISPER_MODEL` / `ECA_REPORT_MODEL` で上書きできます。`ORCAROUTER_API_KEY` が
+未設定でもレポート生成はGroqへ自動フォールバックするため起動は可能で、
 どの機能が使えないかを起動時に表示します。ハンズフリー機能には
 `pip install "pipecat-ai[webrtc,groq,silero]"` が必要で、マイク利用には
 `localhost` またはHTTPSが必須です（ブラウザ側の制約）。
 
-## 8. 参考リンク
+## 8. 開発の経緯
+
+`feature/OrcaRouter` ブランチのコミット履歴（`git log --oneline`）から見た開発の流れです。
+
+| コミット | 内容 |
+|---|---|
+| `4d4327c` | 初期モノレポ統合 — `Converse_2way` / `Face_rec` / `voice_rec` / `med_mgmt` を独立サブアプリとして取り込み |
+| `1e275ba` | `eld_care_assist` を新規作成 — 日次チェックイン機能と統合ハブの概念を確立 |
+| `daf69ec` | 「電話して」検知（`calls.py`）、`fam_dashboard` の構築、ルート起動スクリプト `run.py` を追加 |
+| `2e98218` | デモ用時刻操作（`democlock.py`）と服薬リマインダー通知を追加 |
+| `ddec4a9` | **OrcaRouter統合** — `orca_router_api.py` を追加し、レポート生成系3エンドポイントに接続、本ドキュメントを追加 |
+| `0d1c266` | `.env.example` に `ORCAROUTER_API_KEY` を追加 |
+
+## 9. 参考リンク
 
 - 参考にした記事構成: [Zenn「Anatom-AI」](https://zenn.dev/jcs300/articles/5511ded660f522)
 - 本リポジトリの README: [README.md](../README.md)
