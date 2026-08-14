@@ -339,7 +339,7 @@ async function loadResidentHome() {
     const m = await (await fetch("/api/medications/today")).json();
     // Only a dose near its scheduled time counts as "now"; older ones are
     // missed doses, shown to the care team rather than nagged about here.
-    const due = (m.due || []).find(d => (d.late_minutes ?? 0) <= MED_REMIND_WINDOW_MIN);
+    const due = (m.due || []).find(d => (d.late_minutes ?? 0) <= MED_GIVE_UP_MIN);
     const next = m.next;
     if (due) {
       $("residentNext").innerHTML =
@@ -1233,14 +1233,17 @@ const MED_POLL_MS = 30 * 1000;         // how often we check for a due dose
    Five attempts five minutes apart is about twenty minutes of trying. */
 const MED_MAX_ASKS = 5;
 
-/* How late a dose can be and still be announced out loud. due_now() keeps
-   returning any pending dose for the rest of the day, so without this an 08:00
-   dose nobody marked would still be announcing itself at 8pm. */
-const MED_REMIND_WINDOW_MIN = 120;
+/* How long a dose is chased before it is written off.
+   30 minutes past its time it is marked not taken and the reminders stop.
+   Without a cutoff, due_now() keeps returning any pending dose for the rest of
+   the day, so an 08:00 dose nobody marked would still be announcing at 8pm --
+   and the record would still claim it was merely "pending". */
+const MED_GIVE_UP_MIN = 30;
 
 let medAsking = false;                  // one announcement at a time
 const medLastAsked = {};                // dose key -> timestamp
 const medAskCount = {};                 // dose key -> how many times asked
+const medWrittenOff = {};               // dose key -> already marked missed
 
 const doseKey = d => `${d.med_id}|${d.day}|${d.slot}`;
 
@@ -1255,10 +1258,19 @@ async function medicineTick() {
   try { m = await (await fetch("/api/medications/today")).json(); }
   catch (e) { return; }
 
+  // Anything already past the cutoff is written off now, whether or not it was
+  // ever announced -- the app may have been closed when it fell due.
+  const expired = (m.due || []).filter(d => (d.late_minutes ?? 0) > MED_GIVE_UP_MIN);
+  if (expired.length) {
+    await Promise.all(expired.map(d => writeOffDose(d, false)));
+    if (currentTab() === "meds") loadMeds();
+    if (currentTab() === "residentHome") loadResidentHome();
+  }
+
   const due = (m.due || []).filter(d => {
     const k = doseKey(d);
-    if ((d.late_minutes ?? 0) > MED_REMIND_WINDOW_MIN) return false;
-    if ((medAskCount[k] || 0) >= MED_MAX_ASKS) return false;   // given up
+    if ((d.late_minutes ?? 0) > MED_GIVE_UP_MIN) return false;
+    if ((medAskCount[k] || 0) >= MED_MAX_ASKS) return false;   // asked enough
     const last = medLastAsked[k];
     return !last || Date.now() - last >= MED_REPEAT_MS;
   });
@@ -1311,6 +1323,7 @@ async function askAboutDose(dose) {
       medBanner(`<div class="note good"><span class="ic">\u2713</span><div>${esc(t("medThanks")(dose.name))}</div></div>`);
       setTimeout(() => medBanner(""), 6000);
       delete medAskCount[key];
+      delete medWrittenOff[key];
       if (currentTab() === "meds") loadMeds();
       if (currentTab() === "residentHome") loadResidentHome();
     } else if (lastAttempt) {
@@ -1330,16 +1343,28 @@ async function askAboutDose(dose) {
    this dose. It is marked "skipped" rather than "taken" so the care team and
    the family dashboard see it as missed -- assuming it was swallowed because
    the resident went quiet would be the dangerous choice. */
-async function giveUpOnDose(dose) {
-  await fetch("/api/medications/dose", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ med_id: dose.med_id, day: dose.day,
-                           slot: dose.slot, status: "skipped" }) });
-  medBanner(`<div class="note bad"><span class="ic">\u26a0</span><div>${esc(t("medGaveUp")(dose.name))}</div></div>`);
-  setTimeout(() => medBanner(""), 12000);
-  if (currentTab() === "meds") loadMeds();
-  if (currentTab() === "residentHome") loadResidentHome();
+async function writeOffDose(dose, announce = true) {
+  const k = doseKey(dose);
+  if (medWrittenOff[k]) return;               // only once per dose
+  medWrittenOff[k] = true;
+  try {
+    await fetch("/api/medications/dose", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ med_id: dose.med_id, day: dose.day,
+                             slot: dose.slot, status: "skipped" }) });
+  } catch (e) { medWrittenOff[k] = false; return; }   // let it retry later
+
+  if (announce) {
+    medBanner(`<div class="note bad"><span class="ic">\u26a0</span><div>${esc(t("medGaveUp")(dose.name))}</div></div>`);
+    setTimeout(() => medBanner(""), 12000);
+    if (currentTab() === "meds") loadMeds();
+    if (currentTab() === "residentHome") loadResidentHome();
+  }
 }
+
+/* Kept as the name the ask-loop calls, so the last failed attempt still
+   explains itself out loud. */
+const giveUpOnDose = (dose) => writeOffDose(dose, true);
 
 /* Tapping the button is always available -- voice is an addition, not a
    requirement, and a resident may simply prefer to press it. */
