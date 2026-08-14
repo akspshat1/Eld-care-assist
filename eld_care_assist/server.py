@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 import config
 import democlock
 import groq_api
+import orca_router_api
 import engines
 import handsfree
 import family
@@ -534,7 +535,7 @@ async def api_conv_record(cid: int, lang: str = "en"):
     lang_line = ("Write the values in Japanese." if lang == "ja"
                  else "Write the values in English.")
     try:
-        data = groq_api.chat_json(EXTRACT_SYSTEM, f"{lang_line}\n\n{text}")
+        data = orca_router_api.chat_json(EXTRACT_SYSTEM, f"{lang_line}\n\n{text}")
     except groq_api.GroqError as e:
         return _err(str(e))
 
@@ -725,7 +726,7 @@ def api_report(day: str = "", resident_id: int | None = None, lang: str = "en"):
     lang_line = ("Write the report in Japanese." if lang == "ja"
                  else "Write the report in English.")
     try:
-        text = groq_api.chat(
+        text = orca_router_api.chat(
             [{"role": "system", "content": REPORT_SYSTEM},
              {"role": "user", "content": f"{lang_line}\n\nDay: {day}\n"
               + "\n".join(lines)}],
@@ -762,7 +763,7 @@ def api_family_timeline(resident_id: int, days: int = 14):
 
 @app.get("/api/family/digest")
 def api_family_digest(resident_id: int, lang: str = "en"):
-    if not groq_api.ready():
+    if not (orca_router_api.ready() or groq_api.ready()):
         return _err(groq_api.missing_key_message())
     try:
         data = family.overview(store, engines.get_med_store, resident_id)

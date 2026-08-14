@@ -14,7 +14,7 @@ import os
 import sys
 
 import config
-import groq_api
+import orca_router_api
 
 _sources = None
 _error = None
@@ -114,7 +114,7 @@ def digest(data, lang="en"):
 
     lang_line = ("Write the update in Japanese." if lang == "ja"
                  else "Write the update in English.")
-    return groq_api.chat(
+    return orca_router_api.chat(
         [{"role": "system", "content": DIGEST_SYSTEM},
          {"role": "user", "content": lang_line + "\n\n" + "\n".join(lines)}],
         temperature=0.4, max_tokens=350)
