@@ -175,8 +175,11 @@ def api_digest(resident_id: int, lang: str = "en"):
         r = requests.post(
             f"{config.GROQ_BASE_URL}/chat/completions",
             headers={"Authorization": f"Bearer {config.GROQ_API_KEY}"},
+            # A reasoning model bills its thinking against max_tokens, so a
+            # budget sized for the digest alone comes back empty. Keep the
+            # thinking short and leave room for both.
             json={"model": config.TEXT_MODEL, "temperature": 0.4,
-                  "max_tokens": 350,
+                  "max_tokens": 1200, "reasoning_effort": "low",
                   "messages": [{"role": "system", "content": DIGEST_SYSTEM},
                                {"role": "user",
                                 "content": lang_line + "\n\n" + "\n".join(lines)}]},

@@ -68,7 +68,7 @@ _load_dotenv()
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-TEXT_MODEL = os.environ.get("FAM_TEXT_MODEL", "llama-3.3-70b-versatile")
+TEXT_MODEL = os.environ.get("FAM_TEXT_MODEL", "openai/gpt-oss-120b")
 TIMEOUT_SEC = int(os.environ.get("FAM_TIMEOUT_SEC", "60"))
 
 # Thresholds that decide what the family is told about.

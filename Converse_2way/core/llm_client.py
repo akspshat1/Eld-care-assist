@@ -15,6 +15,10 @@ def chat_completion(messages, temperature=0.7, response_format=None):
     return the assistant's reply text. Pass response_format={"type": "json_object"}
     to ask the model to reply with JSON only."""
     kwargs = {"model": GROQ_MODEL, "messages": messages, "temperature": temperature}
+    # Reasoning models think before answering, which is slow and wordy for a
+    # spoken reply. Keep it to a minimum where the model supports the setting.
+    if any(h in GROQ_MODEL.lower() for h in ("gpt-oss", "qwen3", "deepseek-r1")):
+        kwargs["reasoning_effort"] = "low"
     if response_format is not None:
         kwargs["response_format"] = response_format
     response = _client.chat.completions.create(**kwargs)

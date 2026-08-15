@@ -69,9 +69,35 @@ def _raise_for(r, payload=None):
     raise GroqError(f"Groq error {r.status_code}: {detail}")
 
 
+# Models that think before answering. Their reasoning is billed against
+# max_tokens, so a budget sized for a plain model runs out mid-thought and the
+# reply arrives truncated -- in JSON mode that surfaces as a 400 that reads
+# like a prompt problem. Keeping the reasoning short fixes both.
+_REASONING_HINTS = ("gpt-oss", "qwen3", "deepseek-r1", "o1", "o3")
+
+
+def _is_reasoning_model(model):
+    m = (model or "").lower()
+    return any(h in m for h in _REASONING_HINTS)
+
+
+def _prepare(payload):
+    """Adjust a payload for whichever model is actually configured."""
+    if _is_reasoning_model(payload.get("model")):
+        # "none" is rejected by gpt-oss ("must be low, medium or high"); low is
+        # the least it will accept.
+        payload.setdefault("reasoning_effort", "low")
+        # Leave room for the thinking as well as the answer.
+        if payload.get("max_tokens"):
+            floor = 1200 if "response_format" in payload else 900
+            payload["max_tokens"] = max(payload["max_tokens"], floor)
+    return payload
+
+
 def _post_chat(payload, retries_left=1):
     if not config.groq_ready():
         raise GroqError(config.missing_key_message())
+    payload = _prepare(payload)
     try:
         r = requests.post(f"{config.GROQ_BASE_URL}/chat/completions",
                           headers=_headers(), json=payload,

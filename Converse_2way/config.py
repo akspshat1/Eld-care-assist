@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # --- LLM provider settings (Groq now, swappable later) ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_WHISPER_MODEL = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
 GROQ_API_BASE = "https://api.groq.com/openai/v1"
 

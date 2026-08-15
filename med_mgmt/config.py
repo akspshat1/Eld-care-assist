@@ -76,7 +76,7 @@ GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1"
 # Structured extraction from prescription text.
 GROQ_TEXT_MODEL = os.environ.get("MED_TEXT_MODEL",
                                  os.environ.get("GROQ_TEXT_MODEL",
-                                                "llama-3.3-70b-versatile"))
+                                                "openai/gpt-oss-120b"))
 
 # Transcribing photos of prescriptions. Must support image input.
 # See https://console.groq.com/docs/models -- IDs change over time.

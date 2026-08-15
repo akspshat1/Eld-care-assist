@@ -90,7 +90,7 @@ Photos go through **two passes**, on purpose:
 
 1. The vision model (`qwen/qwen3.6-27b`) **transcribes** the image — that is
    all it does, and it is sent **once**.
-2. The text model (`llama-3.3-70b-versatile`) turns that transcription into
+2. The text model (`openai/gpt-oss-120b`) turns that transcription into
    the structured schedule.
 
 Asking one vision model to do both jobs at once was measurably unreliable: on a

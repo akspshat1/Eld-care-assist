@@ -20,7 +20,7 @@
 ## 技術スタック
 
 - Python 3.11+（両UI共通のバックエンドロジック）
-- LLM: GroqCloud API（`groq` SDK, モデル: `llama-3.3-70b-versatile`）
+- LLM: GroqCloud API（`groq` SDK, モデル: `openai/gpt-oss-120b`）
 - 音声入力(STT): GroqCloud Whisper API（`whisper-large-v3-turbo`）
 - DB: [ChromaDB](https://www.trychroma.com/)（`chromadb`, ローカル永続クライアント）。将来的に会話履歴をRAG的に検索活用できるようにするため採用
 - 音声合成（Streamlitのみ）: pyttsx3（オフライン）

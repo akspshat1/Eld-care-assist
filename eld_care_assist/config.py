@@ -72,7 +72,7 @@ ORCAROUTER_BASE_URL = os.environ.get("ORCAROUTER_BASE_URL", "https://api.orcarou
 ORCAROUTER_REPORT_MODEL = os.environ.get("ECA_REPORT_MODEL", "orcarouter/auto")
 
 # Conversation, summaries, check-in write-ups.
-TEXT_MODEL = os.environ.get("ECA_TEXT_MODEL", "llama-3.3-70b-versatile")
+TEXT_MODEL = os.environ.get("ECA_TEXT_MODEL", "openai/gpt-oss-120b")
 # Reading prescription photos.
 VISION_MODEL = os.environ.get("ECA_VISION_MODEL", "qwen/qwen3.6-27b")
 # Speech to text.

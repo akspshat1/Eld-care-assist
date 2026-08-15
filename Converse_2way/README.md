@@ -33,7 +33,7 @@ There are two frontends, sharing the same SQLite DB and Python backend logic:
 ## Tech stack
 
 - Python 3.11+ backend logic, shared by both UIs
-- LLM: GroqCloud API (`groq` SDK, model: `llama-3.3-70b-versatile`)
+- LLM: GroqCloud API (`groq` SDK, model: `openai/gpt-oss-120b`)
 - Speech-to-text: GroqCloud Whisper API (`whisper-large-v3-turbo`)
 - DB: [ChromaDB](https://www.trychroma.com/) (`chromadb`, local persistent
   client), chosen so conversation history can later be used for RAG-style

@@ -212,7 +212,7 @@ sequenceDiagram
 |---|---|
 | 言語 | Python（バックエンド）、JavaScript / HTML（フロントエンド） |
 | Webフレームワーク | FastAPI + Uvicorn |
-| AI API | Groq API（`llama-3.3-70b-versatile` ほか、Vision・Whisperモデルを含む） |
+| AI API | Groq API（`openai/gpt-oss-120b` ほか、Vision・Whisperモデルを含む） |
 | 画像処理 | OpenCV, onnxruntime, Pillow（顔感情のONNXモデル推論） |
 | 音声対話 | pipecat-ai（WebRTC, Silero VAD, Groq）— `Converse_2way` から再利用 |
 | データストア | SQLite（`store.py`, `data/care.db`） |

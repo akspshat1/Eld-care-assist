@@ -85,9 +85,29 @@ def _retry_after_seconds(r):
     return float(m.group(1)) if m else None
 
 
+# Models that think before answering. The thinking is billed against
+# max_tokens, so a budget sized for a plain model runs out mid-thought and the
+# reply comes back truncated -- in JSON mode that looks like a prompt problem.
+_REASONING_HINTS = ("gpt-oss", "qwen3", "deepseek-r1", "o1", "o3")
+
+
+def _prepare(payload):
+    model = (payload.get("model") or "").lower()
+    if any(h in model for h in _REASONING_HINTS):
+        # gpt-oss rejects "none" outright: it must be low, medium or high.
+        if payload.get("reasoning_effort") == "none" and "gpt-oss" in model:
+            payload["reasoning_effort"] = "low"
+        payload.setdefault("reasoning_effort", "low")
+        if payload.get("max_tokens"):
+            floor = 1600 if "response_format" in payload else 900
+            payload["max_tokens"] = max(payload["max_tokens"], floor)
+    return payload
+
+
 def _post(payload, _retries_left=1):
     if not config.groq_ready():
         raise GroqError(config.missing_key_message())
+    payload = _prepare(payload)
 
     try:
         r = requests.post(
